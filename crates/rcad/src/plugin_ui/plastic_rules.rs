@@ -3,9 +3,9 @@
 //! plugin's own document data. Manage Plastic Rules lists the rules, adds
 //! one from a preset or blank, edits its values (expressions over the
 //! rule's symbols, e.g. `0.5*T`) and material, and deletes; Assign Plastic
-//! Rule puts a body under a rule (or none). Both store the whole data with
-//! one `SetPluginData` (one undo step, its parameters and materials
-//! applied with it).
+//! Rule puts a body or an assembly component under a rule (or none). Both
+//! store the whole data with one `SetPluginData` (one undo step, its
+//! parameters and materials applied with it).
 
 use std::collections::BTreeMap;
 
@@ -153,10 +153,35 @@ impl RulesForm {
     }
 }
 
+/// What a rule is assigned to: a body, or an assembly component (its
+/// bodies follow the component's rule unless they have their own).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AssignTarget {
+    Body(BodyId),
+    Component(u32),
+}
+
+impl AssignTarget {
+    /// Its assignment map in the data, and its key there.
+    fn slot<'a>(&self, d: &'a mut PlasticData) -> (&'a mut BTreeMap<u32, String>, u32) {
+        match *self {
+            AssignTarget::Body(b) => (&mut d.bodies, b.0),
+            AssignTarget::Component(c) => (&mut d.components, c),
+        }
+    }
+
+    fn current(&self, d: &PlasticData) -> Option<String> {
+        match *self {
+            AssignTarget::Body(b) => d.bodies.get(&b.0).cloned(),
+            AssignTarget::Component(c) => d.components.get(&c).cloned(),
+        }
+    }
+}
+
 /// Assign Plastic Rule.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AssignForm {
-    pub body: Option<BodyId>,
+    pub target: Option<AssignTarget>,
     /// None: no rule.
     pub rule: Option<String>,
     pub pending: bool,
@@ -215,11 +240,12 @@ impl RcadApp {
             .selected_body
             .or_else(|| self.selected_face().and_then(|f| f.body))
             .or_else(|| self.solid_bodies().first().map(|b| b.0));
-        let rule = body
-            .and_then(|b| d.bodies.get(&b.0).cloned())
+        let target = body.map(AssignTarget::Body);
+        let rule = target
+            .and_then(|t| t.current(&d))
             .or_else(|| d.rules.first().map(|r| r.name.clone()));
         self.plugins.assign = Some(AssignForm {
-            body,
+            target,
             rule,
             pending: false,
             status: None,
@@ -418,6 +444,24 @@ impl RcadApp {
             .unwrap_or(serde_json::Value::Null);
         let d = PlasticData::parse(&data).unwrap_or_default();
         let bodies = self.solid_bodies();
+        let components: Vec<(u32, String)> = self
+            .summary
+            .assembly
+            .components
+            .iter()
+            .map(|c| (c.id.0, c.name.clone()))
+            .collect();
+        let target_name = |t: Option<AssignTarget>| match t {
+            Some(AssignTarget::Body(b)) => bodies
+                .iter()
+                .find(|x| x.0 == b)
+                .map_or("(choose)".to_string(), |b| b.1.clone()),
+            Some(AssignTarget::Component(c)) => components
+                .iter()
+                .find(|x| x.0 == c)
+                .map_or("(choose)".to_string(), |c| format!("{} (component)", c.1)),
+            None => "(choose)".into(),
+        };
         let mut open = true;
         let mut assign = false;
         let mut manage = false;
@@ -428,18 +472,25 @@ impl RcadApp {
             .resizable(false)
             .show(ctx, |ui| {
                 crate::form::form(ui, "assign_rule", |ui| {
-                    let name = f
-                        .body
-                        .and_then(|b| bodies.iter().find(|x| x.0 == b))
-                        .map_or("(choose)".to_string(), |b| b.1.clone());
-                    crate::form::combo(ui, "Body", name, |ui| {
+                    crate::form::combo(ui, "Assign to", target_name(f.target), |ui| {
                         for (id, n) in &bodies {
-                            ui.selectable_value(&mut f.body, Some(*id), n)
+                            ui.selectable_value(&mut f.target, Some(AssignTarget::Body(*id)), n)
                                 .named(&format!("Assign body {n}"));
+                        }
+                        if !components.is_empty() {
+                            ui.separator();
+                        }
+                        for (id, n) in &components {
+                            ui.selectable_value(
+                                &mut f.target,
+                                Some(AssignTarget::Component(*id)),
+                                format!("{n} (component)"),
+                            )
+                            .named(&format!("Assign component {n}"));
                         }
                     })
                     .response
-                    .probe("Assign body");
+                    .probe("Assign target");
                     let rule = f.rule.clone().unwrap_or_else(|| "(none)".into());
                     crate::form::combo(ui, "Rule", rule, |ui| {
                         ui.selectable_value(&mut f.rule, None, "(none)")
@@ -452,9 +503,19 @@ impl RcadApp {
                     .response
                     .probe("Assign rule");
                 });
-                if let Some(b) = f.body {
-                    let now = d.bodies.get(&b.0).map_or("none", String::as_str);
-                    ui.small(format!("Current rule of this body: {now}"));
+                match f.target {
+                    Some(t @ AssignTarget::Body(_)) => {
+                        let now = t.current(&d).unwrap_or_else(|| "none".into());
+                        ui.small(format!("Current rule of this body: {now}"));
+                    }
+                    Some(t @ AssignTarget::Component(_)) => {
+                        let now = t.current(&d).unwrap_or_else(|| "none".into());
+                        ui.small(format!(
+                            "Current rule of this component: {now}. Its bodies follow it \
+                             unless they have a rule of their own."
+                        ));
+                    }
+                    None => {}
                 }
                 if d.rules.is_empty() {
                     ui.weak("No rules yet.");
@@ -466,7 +527,10 @@ impl RcadApp {
                 );
                 ui.horizontal(|ui| {
                     assign = ui
-                        .add_enabled(f.body.is_some() && !f.pending, egui::Button::new("Assign"))
+                        .add_enabled(
+                            f.target.is_some() && !f.pending,
+                            egui::Button::new("Assign"),
+                        )
                         .named("Assign rule")
                         .clicked();
                     if f.pending {
@@ -475,14 +539,15 @@ impl RcadApp {
                 });
                 status_ui(ui, &f.status);
             });
-        if assign && let Some(b) = f.body {
+        if assign && let Some(t) = f.target {
             let mut d = d;
+            let (map, key) = t.slot(&mut d);
             match &f.rule {
                 Some(r) => {
-                    d.bodies.insert(b.0, r.clone());
+                    map.insert(key, r.clone());
                 }
                 None => {
-                    d.bodies.remove(&b.0);
+                    map.remove(&key);
                 }
             }
             f.pending = true;

@@ -1199,9 +1199,11 @@ impl RcadApp {
             measurements,
             mesh,
             plugin_data,
+            analysis_mesh,
             ..
         } = r;
-        self.plugins.on_reply(&command, &response, plugin_data);
+        self.plugins
+            .on_reply(&command, &response, plugin_data, analysis_mesh);
         let doc_changed = summary.doc_id != self.summary.doc_id;
         // A superseded edit was skipped by the worker because a newer edit of the
         // same parameter is queued; its summary is not a result. Keep the user's
@@ -1327,6 +1329,9 @@ impl RcadApp {
         };
         self.summary = summary;
         self.measurements = measurements;
+        self.plugins
+            .model_state(self.summary.doc_id, self.summary.revision);
+        self.bind_rules_reply(&response);
         if let Some(sel) = self.selected
             && !self.summary.features.iter().any(|f| f.id == sel)
         {
@@ -3132,6 +3137,7 @@ mod tests {
             mesh: MeshUpdate::Unchanged,
             followup: true,
             plugin_data: Default::default(),
+            analysis_mesh: None,
         });
         let body = |id| app.summary.bodies.iter().find(|b| b.id == id).unwrap();
         assert!(body(good).measurements.is_some());

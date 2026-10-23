@@ -199,6 +199,57 @@ pub struct Reply {
     /// Plugin-owned document data after the command (plugin id -> data, e.g.
     /// the plastic rules), for the plugin dialogs. Empty without a document.
     pub plugin_data: PluginData,
+    /// The analysed body's tessellation, for a plugin analysis report with
+    /// per-triangle arrays (a viewport colour map; see [`AnalysisMesh`]).
+    pub analysis_mesh: Option<AnalysisMesh>,
+}
+
+/// The tessellation a plugin analysis reads, rebuilt for display: the same
+/// `rcad_kernel::tessellate(body, chord)` call and chord as the host's
+/// analysis input (deterministic for a body and chord), so its triangles are
+/// indexed like the report's per-triangle arrays. Derived display data only.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AnalysisMesh {
+    pub body: rcad_document::BodyId,
+    pub chord: f64,
+    /// Triangles of the tessellation (body coordinates).
+    pub triangles: usize,
+    /// The triangles' corners as drawn: one list per displayed placement of
+    /// the body (one for a loose body, one per visible occurrence).
+    pub placed: Vec<Vec<[[f32; 3]; 3]>>,
+}
+
+/// [`AnalysisMesh`] of the body a plugin analysis report names, when the
+/// report has per-triangle arrays (`triangles`). None otherwise, or when
+/// the body is gone or does not tessellate (the colour map is then
+/// unavailable; the report itself is unaffected).
+fn analysis_mesh(
+    session: &Session,
+    report: &serde_json::Value,
+    chord: f64,
+) -> Option<AnalysisMesh> {
+    report.get("triangles")?.as_object()?;
+    let id = rcad_document::BodyId(u32::try_from(report.get("body")?.as_u64()?).ok()?);
+    let ev = session.model()?.evaluation();
+    let brep = ev.body_by_id(id)?.geometry.brep()?;
+    let tm = rcad_kernel::tessellate(brep, chord).ok()?;
+    let triangles = tm.triangles.len();
+    let f = |p: [f64; 3]| p.map(|v| v as f32);
+    let placed = crate::assembly_ui::placed_meshes(ev, id, tm)
+        .into_iter()
+        .map(|(m, _, _)| {
+            m.triangles
+                .iter()
+                .map(|t| t.map(|i| m.positions.get(i as usize).copied().map_or([0.0; 3], f)))
+                .collect()
+        })
+        .collect();
+    Some(AnalysisMesh {
+        body: id,
+        chord,
+        triangles,
+        placed,
+    })
 }
 
 /// Plugin id -> that plugin's document data.
@@ -271,6 +322,7 @@ fn superseded_reply(session: &Session, cmd: Command, key: &str) -> Reply {
         mesh: MeshUpdate::Unchanged,
         followup: false,
         plugin_data: plugin_data(session),
+        analysis_mesh: None,
     }
 }
 
@@ -355,6 +407,7 @@ fn cancelled_reply(session: &Session, cmd: Command) -> Reply {
         mesh: MeshUpdate::Unchanged,
         followup: false,
         plugin_data: plugin_data(session),
+        analysis_mesh: None,
     }
 }
 
@@ -380,6 +433,12 @@ pub fn execute(session: &mut Session, cmd: Command) -> Reply {
     let measurements = session
         .model()
         .and_then(|m| m.evaluation().measurements.clone());
+    let analysis_mesh = match (&cmd, &response.plugin_report) {
+        (Command::RunPluginAnalysis(c), Some(rep)) if response.ok => {
+            analysis_mesh(session, rep, c.chord)
+        }
+        _ => None,
+    };
     response.elapsed_ms = Some(t0.elapsed().as_secs_f64() * 1000.0);
     Reply {
         command: cmd,
@@ -389,6 +448,7 @@ pub fn execute(session: &mut Session, cmd: Command) -> Reply {
         mesh,
         followup: false,
         plugin_data: plugin_data(session),
+        analysis_mesh,
     }
 }
 
@@ -639,6 +699,7 @@ fn adopt(session: &mut Session, (doc_id, revision, ok, failed): Measured) -> Opt
         mesh: MeshUpdate::Unchanged,
         followup: true,
         plugin_data: plugin_data(session),
+        analysis_mesh: None,
     })
 }
 

@@ -2287,6 +2287,7 @@ impl RcadApp {
                         }
                     }
                 }
+                self.core_rule_ui(ui, &dlg, opened);
                     }));
                 let invalid = crate::dialogs::invalid_fields();
                 if let Some(why) = &invalid {
@@ -2434,6 +2435,7 @@ impl RcadApp {
                         Dialog::ExportStl(_) | Dialog::Export3mf(_) | Dialog::Import(_)
                     );
                     let token = self.request_token(cmd);
+                    self.core_rule_ok(&dlg, token);
                     if let Dialog::Import(f) = &mut dlg {
                         f.pending = token;
                         f.error = None;

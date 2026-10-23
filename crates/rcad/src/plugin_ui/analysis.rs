@@ -1,10 +1,14 @@
-//! The generic plugin analysis window (Design Advice is the first): inputs,
+//! The generic plugin analysis window (Design Advice, Draft Analysis,
+//! Accessibility, Minimum Radius, and any analysis of any plugin): inputs,
 //! parameters and choices from the [`rcad_plugin::AnalysisSchema`], Run
 //! sends `RunPluginAnalysis`, and the report is shown as its `summary`
 //! values and its `alerts` list (the report layout plugins share, see
-//! docs/PLUGINS.md). Values derived from a tessellation are labelled
-//! approximate with the report's own note. Clicking an alert selects the
-//! face it names. Read-only: nothing here changes the document.
+//! docs/PLUGINS.md), with a tailored results table for the analyses this
+//! window knows ([`tailored`]). Values derived from a tessellation are
+//! labelled approximate with the report's own note. Clicking an alert
+//! selects the face it names. A report with per-triangle arrays can be
+//! shown on the model as a colour map ([`super::colour_map`]). Read-only:
+//! nothing here changes the document.
 
 use std::collections::BTreeMap;
 
@@ -15,6 +19,7 @@ use rcad_document::{BodyId, PluginInput, SketchPlane};
 use rcad_plugin::{ChoiceSchema, InputKind, InputSchema};
 use serde_json::Value;
 
+use super::colour_map::ColourMap;
 use super::feature::{ParamField, param_fields};
 use super::{slot_of, words};
 use crate::app::RcadApp;
@@ -36,6 +41,10 @@ pub struct AnalysisForm {
     pub pending: bool,
     /// The last report, or why the analysis was refused.
     pub result: Option<Result<Value, String>>,
+    /// The analysed body's tessellation for the report (colour map).
+    pub mesh: Option<crate::engine::AnalysisMesh>,
+    /// Why the colour map of the report is unavailable.
+    pub map_error: Option<String>,
 }
 
 impl AnalysisForm {
@@ -56,6 +65,8 @@ impl AnalysisForm {
                 .collect(),
             pending: false,
             result: None,
+            mesh: None,
+            map_error: None,
         })
     }
 
@@ -153,6 +164,8 @@ impl RcadApp {
         let mut open = true;
         let mut run = false;
         let mut select: Option<(BodyId, u32)> = None;
+        let mut map_action: Option<bool> = None;
+        let map_shown = self.plugins.colour_map.is_some();
         let bodies = self.solid_bodies();
         let picked = self.selected_face().and_then(|f| f.reference);
         egui::Window::new(form.name.clone())
@@ -298,11 +311,57 @@ impl RcadApp {
                         ui.colored_label(crate::theme::of(ui).bad, e);
                     }
                     Some(Ok(rep)) => {
-                        select = report_ui(ui, rep);
+                        report_ui(ui, &form.analysis, rep);
+                        if super::colour_map::classify(rep).is_some() {
+                            ui.horizontal(|ui| {
+                                if map_shown {
+                                    if ui.button("Hide").named("Hide colour map").clicked() {
+                                        map_action = Some(false);
+                                    }
+                                } else if ui
+                                    .button("Show on model")
+                                    .named("Show on model")
+                                    .on_hover_text(
+                                        "Colour the analysed body's triangles in the 3D view",
+                                    )
+                                    .clicked()
+                                {
+                                    map_action = Some(true);
+                                }
+                            });
+                            if let Some(e) = &form.map_error {
+                                ui.colored_label(
+                                    crate::theme::of(ui).warn,
+                                    format!("Colour map unavailable: {e}"),
+                                );
+                            }
+                        }
+                        alerts_ui(ui, rep, &mut select);
                     }
                 }
             });
         let _ = crate::dialogs::take_left_invalid();
+        match map_action {
+            Some(true) => {
+                if let Some(Ok(rep)) = &form.result {
+                    match ColourMap::build(
+                        rep,
+                        form.mesh.as_ref(),
+                        &form.name,
+                        self.summary.doc_id,
+                        self.summary.revision,
+                    ) {
+                        Ok(m) => {
+                            form.map_error = None;
+                            self.plugins.colour_map = Some(m);
+                        }
+                        Err(e) => form.map_error = Some(e),
+                    }
+                }
+            }
+            Some(false) => self.plugins.colour_map = None,
+            None => {}
+        }
         if run {
             match form.command() {
                 Ok(c) => {
@@ -333,10 +392,9 @@ impl RcadApp {
     }
 }
 
-/// A report: approximation note, summary values, alerts (a clicked alert
-/// returns its body and face).
-fn report_ui(ui: &mut egui::Ui, rep: &Value) -> Option<(BodyId, u32)> {
-    let mut select = None;
+/// A report: approximation note, the tailored results of a known analysis
+/// and the summary values.
+fn report_ui(ui: &mut egui::Ui, analysis: &str, rep: &Value) {
     ui.separator();
     if let Some(note) = rep
         .get("approximation")
@@ -353,7 +411,24 @@ fn report_ui(ui: &mut egui::Ui, rep: &Value) -> Option<(BodyId, u32)> {
         };
         ui.small(RichText::new(text).weak());
     }
-    if let Some(sum) = rep.get("summary").and_then(Value::as_object) {
+    let rows = tailored(analysis, rep);
+    if !rows.is_empty() {
+        ui.label(RichText::new("Results").strong());
+        egui::Grid::new("plugin_report_results")
+            .num_columns(2)
+            .striped(true)
+            .show(ui, |ui| {
+                for (label, value) in &rows {
+                    ui.label(*label);
+                    ui.label(value);
+                    ui.end_row();
+                }
+            });
+    }
+    let Some(sum) = rep.get("summary").and_then(Value::as_object) else {
+        return;
+    };
+    let grid = |ui: &mut egui::Ui| {
         egui::Grid::new("plugin_report_summary")
             .num_columns(2)
             .striped(true)
@@ -365,68 +440,209 @@ fn report_ui(ui: &mut egui::Ui, rep: &Value) -> Option<(BodyId, u32)> {
                         ui.end_row();
                     }
                 }
-                // Keys this window has no label for are shown as they are.
+                // Keys this window has no label for are shown as they are
+                // (a nested object one row per entry).
                 for (k, v) in sum {
                     if k == "alerts" || SUMMARY.iter().any(|s| s.0 == k) {
                         continue;
                     }
-                    ui.label(words(k));
-                    ui.label(num(v));
-                    ui.end_row();
+                    match v.as_object() {
+                        Some(o) => {
+                            for (k2, v2) in o {
+                                ui.label(format!("{} · {}", words(k), words(k2)));
+                                ui.label(num(v2));
+                                ui.end_row();
+                            }
+                        }
+                        None => {
+                            ui.label(words(k));
+                            ui.label(num(v));
+                            ui.end_row();
+                        }
+                    }
                 }
             });
-        if let Some(counts) = sum.get("alerts").and_then(Value::as_object) {
-            let t: Vec<String> = counts
-                .iter()
-                .map(|(k, n)| format!("{} {}", words(k), num(n)))
-                .collect();
-            ui.label(format!(
-                "Alerts: {}",
-                if t.is_empty() {
-                    "none".to_string()
-                } else {
-                    t.join(", ")
-                }
-            ));
-        }
+    };
+    if rows.is_empty() {
+        grid(ui);
+    } else {
+        egui::CollapsingHeader::new("All summary values")
+            .id_salt("plugin_report_all")
+            .default_open(true)
+            .show(ui, grid);
     }
+    if let Some(counts) = sum.get("alerts").and_then(Value::as_object) {
+        let t: Vec<String> = counts
+            .iter()
+            .map(|(k, n)| format!("{} {}", words(k), num(n)))
+            .collect();
+        ui.label(format!(
+            "Alerts: {}",
+            if t.is_empty() {
+                "none".to_string()
+            } else {
+                t.join(", ")
+            }
+        ));
+    }
+}
+
+/// The report's alerts (a clicked alert sets `select` to its body and face).
+fn alerts_ui(ui: &mut egui::Ui, rep: &Value, select: &mut Option<(BodyId, u32)>) {
     let body = rep
         .get("body")
         .and_then(Value::as_u64)
         .and_then(|b| u32::try_from(b).ok())
         .map(BodyId);
-    if let Some(alerts) = rep.get("alerts").and_then(Value::as_array)
-        && !alerts.is_empty()
-    {
-        ui.label(RichText::new(format!("Alerts ({})", alerts.len())).strong());
-        egui::ScrollArea::vertical()
-            .id_salt("plugin_report_alerts")
-            .max_height(220.0)
-            .show(ui, |ui| {
-                for (i, a) in alerts.iter().enumerate() {
-                    let kind = a.get("kind").and_then(Value::as_str).unwrap_or("?");
-                    let face = a.get("face").and_then(Value::as_u64);
-                    let value = a.get("value").map(num).unwrap_or_default();
-                    let u = a.get("unit").and_then(Value::as_str).unwrap_or("");
-                    let msg = a.get("message").and_then(Value::as_str).unwrap_or("");
-                    let head = match face {
-                        Some(f) => format!("{} · face {f} · {value} {}", words(kind), unit(u)),
-                        None => format!("{} · {value} {}", words(kind), unit(u)),
-                    };
-                    let r = ui
-                        .selectable_label(false, head)
-                        .named(&format!("Alert {}", i + 1))
-                        .on_hover_text("Select this face in the view");
-                    if !msg.is_empty() {
-                        ui.small(msg);
-                    }
-                    if r.clicked()
-                        && let (Some(b), Some(f)) = (body, face.and_then(|f| u32::try_from(f).ok()))
-                    {
-                        select = Some((b, f));
-                    }
-                }
-            });
+    let Some(alerts) = rep.get("alerts").and_then(Value::as_array) else {
+        return;
+    };
+    if alerts.is_empty() {
+        return;
     }
-    select
+    ui.label(RichText::new(format!("Alerts ({})", alerts.len())).strong());
+    egui::ScrollArea::vertical()
+        .id_salt("plugin_report_alerts")
+        .max_height(220.0)
+        .show(ui, |ui| {
+            for (i, a) in alerts.iter().enumerate() {
+                let kind = a.get("kind").and_then(Value::as_str).unwrap_or("?");
+                let face = a.get("face").and_then(Value::as_u64);
+                let value = a.get("value").map(num).unwrap_or_default();
+                let u = a.get("unit").and_then(Value::as_str).unwrap_or("");
+                let msg = a.get("message").and_then(Value::as_str).unwrap_or("");
+                let head = match face {
+                    Some(f) => format!("{} · face {f} · {value} {}", words(kind), unit(u)),
+                    None => format!("{} · {value} {}", words(kind), unit(u)),
+                };
+                let r = ui
+                    .selectable_label(false, head)
+                    .named(&format!("Alert {}", i + 1))
+                    .on_hover_text("Select this face in the view");
+                if !msg.is_empty() {
+                    ui.small(msg);
+                }
+                if r.clicked()
+                    && let (Some(b), Some(f)) = (body, face.and_then(|f| u32::try_from(f).ok()))
+                {
+                    *select = Some((b, f));
+                }
+            }
+        });
+}
+
+fn get<'a>(v: &'a Value, path: &[&str]) -> Option<&'a Value> {
+    path.iter().try_fold(v, |v, k| v.get(*k))
+}
+
+fn area(v: Option<&Value>) -> String {
+    v.map_or("n/a".into(), |v| format!("{} mm²", num(v)))
+}
+
+fn direction(v: Option<&Value>) -> String {
+    match v.and_then(Value::as_array) {
+        Some(a) if a.len() == 3 => {
+            let c: Vec<String> = a.iter().map(num).collect();
+            format!("({})", c.join(", "))
+        }
+        _ => "n/a".into(),
+    }
+}
+
+fn counts(rep: &Value, keys: &[&str]) -> String {
+    keys.iter()
+        .map(|k| get(rep, &["summary", "faces", k]).map_or("0".into(), num))
+        .collect::<Vec<_>>()
+        .join(" / ")
+}
+
+/// Results table of the analyses this window knows, as (label, value);
+/// empty for any other analysis (its summary is shown generically only).
+pub fn tailored(analysis: &str, rep: &Value) -> Vec<(&'static str, String)> {
+    let s = |k: &str| get(rep, &["summary", k]);
+    let src = |k: &str| {
+        rep.get(k)
+            .and_then(Value::as_str)
+            .map_or(String::new(), |s| format!(" from {}", words(s)))
+    };
+    match analysis {
+        "draft_analysis" => vec![
+            (
+                "Pull direction",
+                format!("{}{}", direction(rep.get("pull")), src("pull_source")),
+            ),
+            (
+                "Minimum draft",
+                rep.get("min_draft_deg")
+                    .map_or("n/a".into(), |v| format!("{} °", num(v))),
+            ),
+            ("Positive draft area", area(s("positive_area"))),
+            ("Negative draft area", area(s("negative_area"))),
+            ("Insufficient draft area", area(s("insufficient_area"))),
+            ("Vertical wall area", area(s("vertical_area"))),
+            (
+                "Draft range",
+                match (s("min_deg"), s("max_deg")) {
+                    (Some(a), Some(b)) => format!("{} ° … {} °", num(a), num(b)),
+                    _ => "n/a".into(),
+                },
+            ),
+            (
+                "Faces positive / negative / insufficient / mixed",
+                counts(rep, &["positive", "negative", "insufficient", "mixed"]),
+            ),
+        ],
+        "accessibility" => vec![
+            (
+                "Direction",
+                format!(
+                    "{}{}{}",
+                    direction(rep.get("direction")),
+                    src("direction_source"),
+                    if rep.get("directions").and_then(Value::as_str) == Some("both") {
+                        " and its opposite"
+                    } else {
+                        ""
+                    }
+                ),
+            ),
+            ("Accessible area", area(s("accessible_area"))),
+            ("Inaccessible area", area(s("inaccessible_area"))),
+            ("Blocked area (undercuts)", area(s("blocked_area"))),
+            ("Area facing away", area(s("away_area"))),
+            ("Edge-on area", area(s("vertical_area"))),
+            (
+                "Faces accessible / inaccessible / partial",
+                counts(rep, &["accessible", "inaccessible", "partial"]),
+            ),
+        ],
+        "minimum_radius" => vec![
+            (
+                "Minimum radius limit",
+                rep.get("min_radius")
+                    .map_or("n/a".into(), |v| format!("{} mm", num(v))),
+            ),
+            (
+                "Smallest radius",
+                match s("min_radius") {
+                    Some(v) if !v.is_null() => format!("{} mm", num(v)),
+                    _ => "none (no curved faces)".into(),
+                },
+            ),
+            (
+                "Faces below the limit",
+                s("flagged_faces").map_or("0".into(), num),
+            ),
+            ("Area below the limit", area(s("flagged_area"))),
+            (
+                "Faces exact / approximate",
+                format!(
+                    "{} / {}",
+                    s("exact_faces").map_or("0".into(), num),
+                    s("approximate_faces").map_or("0".into(), num)
+                ),
+            ),
+        ],
+        _ => vec![],
+    }
 }
