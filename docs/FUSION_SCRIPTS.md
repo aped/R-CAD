@@ -120,7 +120,9 @@ exist on every object; collections have `count`, `item(i)` and iteration.
 | `.draftAngle`, `.holeDraftAngle`, `.holeDepth` | `draft_deg`, `hole_draft_deg`, `hole_depth` |
 | `.holeExtentType` | `BossHoleThrough` → hole `through`; `BossBlindDepth` → pilot of `holeDepth`; `BossBlindFull` (or no type and no depth) → pilot the full boss height |
 | `.ribCount`, `.ribLength`, `.ribThickness`, `.ribRotation`, `.ribTotalAngle`, `.ribOffset`, `.ribType` | `rib_count`, `rib_length` (from the axis), `rib_thickness`, `rib_angle_deg`, `rib_total_deg`, `rib_height` = boss height − `ribOffset`; `ribType` `BossRibShapeChamfer` (R-CAD's gusset profile) or `BossRibShapeNone` |
-| `.rootRadius`, `.tipRadius`, `.holeStartRadius`, `.holeEndRadius`, `.ribRootRadius`, `.ribTipRadius`, `.ribDraftAngle`, `.ribOuterDraftAngle` | accepted only as 0 (not modelled) |
+| `.tipRadius` | `tip_radius` (fillet of the shank top) |
+| `.alignmentType` (`BossAlignFlat`, `BossAlignStepOut`, `BossAlignStepIn`), `.alignmentDiameter`, `.alignmentDepth` | `step` (none/out/in), `step_diameter`, `step_depth` |
+| `.rootRadius`, `.holeStartRadius`, `.holeEndRadius`, `.ribRootRadius`, `.ribTipRadius`, `.ribDraftAngle`, `.ribOuterDraftAngle` | accepted only as 0 (not modelled) |
 | `ribFeatures.createInput(curves, thickness, targetBody)`, `RibFeatureInput.setDistanceExtent(depth)`, `.thickness`, `.draftAngle`, `.isFlipped`, `.isSymmetric`, `.targetBody`; `ribFeatures.add` | `plugin_feature` `rib`: `thickness`, `depth`, `draft_deg`; side `right` (the curve direction × the sketch normal) or `left` when flipped; `thickness_side` `symmetric` / `one_side` |
 | `webFeatures.createInput(curves, thickness, targetBody)`, `WebFeatureInput.setDistanceExtent(depth)`, `.setToNextExtent()`, `.thickness`, `.draftAngle`, `.isFlipped`, `.isSymmetric`, `.targetBody`; `webFeatures.add` | `plugin_feature` `web`: as the rib, with `direction` `normal` / `flip` and `extent` `distance` / `to_next` |
 
@@ -171,7 +173,7 @@ was stored keep their plain values.
   mapped.
 - **Fillet:** whole faces only. Variable and chord-length fillets are not mapped, nor is `isG2`.
 - **Boss:** `side2` (the mating boss) is not mapped, because R-CAD's mating boss needs the mate
-  face (use the `mate` input of `plugin_feature` `boss`). Also not mapped: alignment steps,
+  face (use the `mate` input of `plugin_feature` `boss`). Also not mapped: drafted alignment steps,
   counterbores and countersinks on side 1, fillet-shaped ribs, `setRibExtent`, rib cut size and
   chamfer angle, and `isDefaultDirection = False`. The boss offset is a plain value (not bound to
   a parameter).

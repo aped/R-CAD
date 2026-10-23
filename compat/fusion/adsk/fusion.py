@@ -1272,11 +1272,13 @@ class BossFeatureSideInput(Base):
         "ribRotation": ("rib_angle_deg", ANGLE),
         "ribTotalAngle": ("rib_total_deg", ANGLE),
         "ribOffset": (None, LENGTH),
+        "alignmentDiameter": ("step_diameter", LENGTH),
+        "alignmentDepth": ("step_depth", LENGTH),
+        "tipRadius": ("tip_radius", LENGTH),
     }
-    _ENUMS = ("holeExtentType", "ribType")
+    _ENUMS = ("holeExtentType", "ribType", "alignmentType")
     _ZERO_ONLY = {
         "rootRadius": LENGTH,
-        "tipRadius": LENGTH,
         "holeStartRadius": LENGTH,
         "holeEndRadius": LENGTH,
         "ribRootRadius": LENGTH,
@@ -1285,9 +1287,6 @@ class BossFeatureSideInput(Base):
         "ribOuterDraftAngle": ANGLE,
     }
     _UNMAPPED = (
-        "alignmentType",
-        "alignmentDiameter",
-        "alignmentDepth",
         "alignmentDraftAngle",
         "alignmentRootRadius",
         "alignmentTipRadius",
@@ -1319,7 +1318,7 @@ class BossFeatureSideInput(Base):
         elif name in self._UNMAPPED:
             raise NotSupported(
                 "adsk.fusion.BossFeatureSideInput.%s is not in R-CAD's Fusion API subset "
-                "(alignment steps, counterbores/countersinks on side 1 and rib cut "
+                "(drafted alignment steps, counterbores/countersinks on side 1 and rib cut "
                 "profiles are not modelled)" % name
             )
         else:
@@ -1501,6 +1500,15 @@ class BossFeatures(Collection):
             choices["hole"] = hole
         else:
             choices["hole"] = "none"
+        align = side._v.get("alignmentType")
+        if align in (None, BossAlignmentTypes.BossAlignFlat):
+            pass
+        elif align == BossAlignmentTypes.BossAlignStepOut:
+            choices["step"] = "out"
+        elif align == BossAlignmentTypes.BossAlignStepIn:
+            choices["step"] = "in"
+        else:
+            raise NotSupported("BossFeatureSideInput.alignmentType %r is not mapped" % (align,))
         rib = side._v.get("ribType")
         if rib == BossRibShapeTypes.BossRibShapeNone:
             params["rib_count"] = 0

@@ -247,12 +247,34 @@ class Features(unittest.TestCase):
         side = bi.createSideInput()
         with self.assertRaisesRegex(adsk.NotSupported, "BossFeatureSideInput.setCounterbore"):
             side.setCounterbore(V.createByReal(1), V.createByReal(1), V.createByReal(1), V.createByReal(1))
-        with self.assertRaisesRegex(adsk.NotSupported, "BossFeatureSideInput.alignmentDiameter"):
-            side.alignmentDiameter = V.createByReal(1)
+        with self.assertRaisesRegex(adsk.NotSupported, "BossFeatureSideInput.alignmentDraftAngle"):
+            side.alignmentDraftAngle = V.createByReal(0.1)
         with self.assertRaisesRegex(adsk.NotSupported, "BossFeatureSideInput.rootRadius"):
             side.rootRadius = V.createByReal(0.1)
         with self.assertRaisesRegex(adsk.NotSupported, "BossFeatureInput.side2"):
             bi.side2 = bi.createSideInput()
+
+    def test_boss_alignment_step_and_tip_radius(self):
+        design, root = fresh()
+        _, ext = block(root)
+        sk = root.sketches.add(ext.endFaces.item(0))
+        a = sk.sketchPoints.add(P.create(0.5, 0.5, 0))
+        bi = root.features.bossFeatures.createInput()
+        bi.setPositionBySketchPoints(a)
+        side = bi.createSideInput()
+        side.setSimple(V.createByReal(0.6), V.createByString("2 mm"))
+        side.alignmentType = adsk.fusion.BossAlignmentTypes.BossAlignStepOut
+        side.alignmentDiameter = V.createByReal(0.45)
+        side.alignmentDepth = V.createByString("1 mm")
+        side.tipRadius = V.createByReal(0.05)
+        bi.side1 = side
+        bi.offset = V.createByReal(1.0)
+        root.features.bossFeatures.add(bi)
+        c = [x for x in steps() if x["command"].get("feature") == "boss"][0]["command"]
+        self.assertEqual(c["choices"]["step"], "out")
+        self.assertAlmostEqual(c["params"]["step_diameter"], 4.5, places=12)
+        self.assertAlmostEqual(c["params"]["step_depth"], 1.0, places=12)
+        self.assertAlmostEqual(c["params"]["tip_radius"], 0.5, places=12)
 
     def test_rib_and_web(self):
         design, root = fresh()
