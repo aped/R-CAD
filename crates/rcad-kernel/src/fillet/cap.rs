@@ -1224,6 +1224,36 @@ fn volume_of(body: &Body) -> Result<(f64, f64)> {
 type Band = (Vec<Seg>, Lower, Vec<Vec<Seg>>, f64, Vec<HoleBand>);
 type HoleBand = (Vec<Seg>, Vec<Group>, f64);
 
+/// Whether the plane point (0, 0) lies within the outer boundary of `face`
+/// (also when it lies in one of its holes, e.g. the axis of a boss's pilot
+/// hole), by the winding number of each boundary loop sampled 32 times per
+/// edge in the cap frame: some loop winds around it.
+fn face_contains_origin(face: &Face, to2: &impl Fn(Point3) -> ([f64; 2], f64)) -> bool {
+    face.boundaries().iter().any(|w| {
+        let mut wind = 0i32;
+        let mut pts: Vec<[f64; 2]> = Vec::new();
+        for e in w.edge_iter() {
+            let c = e.curve();
+            let (t0, t1) = c.range_tuple();
+            for k in 0..32 {
+                pts.push(to2(c.subs(t0 + (t1 - t0) * k as f64 / 32.0)).0);
+            }
+        }
+        let n = pts.len();
+        for i in 0..n {
+            let (a, b) = (pts[i], pts[(i + 1) % n]);
+            if a[1] <= 0.0 {
+                if b[1] > 0.0 && a[0] * b[1] - b[0] * a[1] > 0.0 {
+                    wind += 1;
+                }
+            } else if b[1] <= 0.0 && a[0] * b[1] - b[0] * a[1] < 0.0 {
+                wind -= 1;
+            }
+        }
+        wind != 0
+    })
+}
+
 fn band_under_cap(body: &Body, cap: &Frame, include_holes: bool) -> Result<Band> {
     let (o, x, y, z) = cap_frame(cap)?;
     let to2 = |p: Point3| {
@@ -1256,9 +1286,20 @@ fn band_under_cap(body: &Body, cap: &Frame, include_holes: bool) -> Result<Band>
         })
         .map(|(i, _)| i)
         .collect();
+    // Several faces in the plane (e.g. the tops of equal bosses): the one
+    // whose boundary contains the frame origin (callers place it inside the
+    // face they mean); none or several containing it is still refused.
+    let caps: Vec<usize> = if caps.len() > 1 {
+        caps.into_iter()
+            .filter(|&i| face_contains_origin(&faces[i], &to2))
+            .collect()
+    } else {
+        caps
+    };
     if caps.len() != 1 {
         return Err(bad(format!(
-            "expected exactly one face in the cap plane, found {}",
+            "expected exactly one face in the cap plane (containing the cap frame's origin \
+             when several lie in it), found {}",
             caps.len()
         )));
     }

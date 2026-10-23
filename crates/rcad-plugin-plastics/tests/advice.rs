@@ -115,6 +115,7 @@ fn request(mesh: BodyMesh, over: &[(&str, f64)], axis: &str) -> AnalysisRequest 
             Resolved::Body(BodyGeom {
                 body: mesh.body,
                 bounds: [[0.0; 3], [1.0; 3]],
+                faces: vec![],
             }),
         )]
         .into(),

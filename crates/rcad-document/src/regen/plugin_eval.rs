@@ -42,6 +42,19 @@ fn parallel_planes(id: FeatureId, body: &Body, frame: &Frame) -> Result<Vec<rp::
         .collect())
 }
 
+/// Every planar face of `body` with its sampled boundary.
+fn planar_faces(id: FeatureId, body: &Body) -> Result<Vec<rp::PlanarFace>> {
+    Ok(k::planar_face_outlines(body)
+        .map_err(kernel(id))?
+        .into_iter()
+        .map(|f| rp::PlanarFace {
+            point: f.point,
+            normal: f.normal,
+            loops: f.loops,
+        })
+        .collect())
+}
+
 /// A resolved placement face.
 fn face_geom(id: FeatureId, frame: &Frame, body: BodyId, st: &Snapshot) -> Result<rp::FaceGeom> {
     let t = brep_target(st, id, body)?;
@@ -126,9 +139,12 @@ fn sketch_geom(id: FeatureId, sketch: FeatureId, st: &Snapshot) -> Result<rp::Sk
         .map(|p| [p.x, p.y])
         .collect();
     let body = so_face_body(st, sketch);
-    let parallel = match body {
-        Some(b) => parallel_planes(id, &brep_target(st, id, BodyId(b))?, &so.frame)?,
-        None => vec![],
+    let (parallel, faces) = match body {
+        Some(b) => {
+            let t = brep_target(st, id, BodyId(b))?;
+            (parallel_planes(id, &t, &so.frame)?, planar_faces(id, &t)?)
+        }
+        None => (vec![], vec![]),
     };
     Ok(rp::SketchGeom {
         frame: to_plugin_frame(&so.frame),
@@ -136,6 +152,7 @@ fn sketch_geom(id: FeatureId, sketch: FeatureId, st: &Snapshot) -> Result<rp::Sk
         points,
         body,
         parallel,
+        faces,
     })
 }
 
@@ -200,6 +217,7 @@ fn resolve_inputs(
                 rp::Resolved::Body(rp::BodyGeom {
                     body: body.0,
                     bounds: [b.min, b.max],
+                    faces: planar_faces(id, &t)?,
                 })
             }
             (rp::InputKind::Sketch, PluginInput::Sketch { sketch }) => {
@@ -298,6 +316,49 @@ pub(super) fn eval_plugin(
     }
     let mut tools = Vec::with_capacity(ops.len());
     for op in &ops {
+        if let rp::Op::EdgeLoop {
+            id: op_id,
+            of,
+            end,
+            blend,
+            size,
+            holes,
+            label,
+        } = op
+        {
+            let what = if label.is_empty() {
+                format!("operation {op_id}")
+            } else {
+                label.clone()
+            };
+            let tool = &tools
+                .iter()
+                .find(|(i, _)| i == of)
+                .ok_or_else(|| {
+                    DocError::Validation(format!("{id}: {what}: operation {of} was not built"))
+                })?
+                .1;
+            let role = if *end {
+                FaceRole::ExtrudeEndCap
+            } else {
+                FaceRole::ExtrudeStartCap
+            };
+            let frame = extrude_face_frame(tool, &FaceRef { feature: id, role }, id)?;
+            let target = tool.body;
+            let t = brep_target(st, id, target)?;
+            let out = match (blend, holes) {
+                (rp::Blend::Fillet, false) => k::fillet_cap_loop(&t, &frame, *size),
+                (rp::Blend::Fillet, true) => k::fillet_cap_face_edges(&t, &frame, *size),
+                (rp::Blend::Chamfer, false) => k::chamfer_cap_loop(&t, &frame, *size),
+                (rp::Blend::Chamfer, true) => k::chamfer_cap_face_edges(&t, &frame, *size),
+            }
+            .map_err(|e| DocError::Kernel {
+                feature: id,
+                detail: format!("{what}: {e}"),
+            })?;
+            replace_body(st, id, target, out);
+            continue;
+        }
         let rp::Op::Prism {
             id: op_id,
             body,
@@ -309,7 +370,10 @@ pub(super) fn eval_plugin(
             taper_deg,
             mode,
             label,
-        } = op;
+        } = op
+        else {
+            continue;
+        };
         let target = BodyId(rp::target_body(&req, body).ok_or_else(|| {
             DocError::Validation(format!("{id}: operation {op_id}: no target body"))
         })?);

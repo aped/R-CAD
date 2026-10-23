@@ -20,10 +20,12 @@ pub mod registry;
 pub mod schema;
 
 pub use geom::{
-    BodyGeom, Curve, FaceGeom, Frame, ParallelPlane, Profile, Resolved, Segment, SketchGeom,
+    BodyGeom, Curve, FaceGeom, Frame, ParallelPlane, PlanarFace, Profile, Resolved, Segment,
+    SketchGeom,
 };
 pub use process::ProcessPlugin;
 pub use registry::{find, plugins, register, unregister};
+
 pub use schema::{
     API_VERSION, AnalysisSchema, ChoiceSchema, FeatureSchema, InputKind, InputSchema, Manifest,
     ParamKind, ParamSchema,
@@ -179,6 +181,37 @@ pub enum Op {
         #[serde(default)]
         label: String,
     },
+    /// Round (`fillet`) or bevel (`chamfer`) the outer edge loop of a cap
+    /// face of an earlier operation `of` of this build (`end`: its end cap,
+    /// else its start cap), `size` mm (radius / leg), through the kernel's
+    /// exact cap-loop blend (docs/FILLETS.md: the loop's walls must run
+    /// straight down to a common depth; the kernel checks its result against
+    /// the closed-form removed volume). With `holes`, the cap's inner loops
+    /// too. `id` names the operation for errors.
+    EdgeLoop {
+        id: u32,
+        of: u32,
+        #[serde(default = "yes")]
+        end: bool,
+        blend: Blend,
+        size: f64,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        holes: bool,
+        #[serde(default)]
+        label: String,
+    },
+}
+
+fn yes() -> bool {
+    true
+}
+
+/// Edge blend of an [`Op::EdgeLoop`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Blend {
+    Fillet,
+    Chamfer,
 }
 
 fn is_zero(v: &f64) -> bool {
@@ -372,7 +405,38 @@ pub fn check_ops(req: &BuildRequest, ops: &[Op]) -> Result<(), PluginError> {
         )));
     }
     let mut ids = std::collections::BTreeSet::new();
+    let mut prisms = std::collections::BTreeSet::new();
     for op in ops {
+        if let Op::EdgeLoop {
+            id,
+            of,
+            size,
+            label,
+            ..
+        } = op
+        {
+            let what = if label.is_empty() {
+                format!("{}: operation {id}", req.feature)
+            } else {
+                format!("{}: {label}", req.feature)
+            };
+            if !ids.insert(*id) {
+                return Err(PluginError::Failed(format!(
+                    "{what}: operation id repeated"
+                )));
+            }
+            if !prisms.contains(of) {
+                return Err(PluginError::Failed(format!(
+                    "{what}: blends operation {of}, which is not an earlier prism of this build"
+                )));
+            }
+            if !(size.is_finite() && *size > 0.0) {
+                return Err(PluginError::Failed(format!(
+                    "{what}: size must be > 0, got {size}"
+                )));
+            }
+            continue;
+        }
         let Op::Prism {
             id,
             body,
@@ -384,7 +448,10 @@ pub fn check_ops(req: &BuildRequest, ops: &[Op]) -> Result<(), PluginError> {
             taper_deg,
             label,
             ..
-        } = op;
+        } = op
+        else {
+            continue;
+        };
         let what = if label.is_empty() {
             format!("{}: operation {id}", req.feature)
         } else {
@@ -394,6 +461,7 @@ pub fn check_ops(req: &BuildRequest, ops: &[Op]) -> Result<(), PluginError> {
         if !ids.insert(*id) {
             return bad("operation id repeated");
         }
+        prisms.insert(*id);
         if target_body(req, body).is_none() {
             return bad(&format!(
                 "'{body}' is not a face or body input, or a sketch on a face of a body"

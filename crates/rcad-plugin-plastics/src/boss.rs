@@ -24,8 +24,12 @@
 //!   of `mate_hole_diameter` through the mate body and a counterbore of
 //!   `cbore_diameter` × `cbore_depth` from its outside face.
 //!
+//! * part 30: with `tip_radius`, a fillet of the shank top's outer edge
+//!   (exact cap-loop blend; refused by the kernel where gussets reach the
+//!   top or the hole is within the radius of the edge).
+//!
 //! Not supported (refused or absent, stated): ribs on a drafted shank
-//! (cone/plane joins), root/tip fillets, drafted ribs, countersinks, alignment steps, a fastener component.
+//! (cone/plane joins), root fillets, drafted ribs, countersinks, alignment steps, a fastener component.
 use crate::util::{EPS, SINK, invalid, placement_points, prism, standing, unsupported};
 use crate::{choice, input, param};
 use rcad_plugin::geom::{back_below_over, dot, footprint_of, next_below_over};
@@ -178,6 +182,15 @@ pub fn schema() -> FeatureSchema {
                 nonneg,
                 None,
                 Some("CL"),
+            ),
+            param(
+                "tip_radius",
+                "Tip fillet radius (0: none)",
+                Length,
+                0.0,
+                nonneg,
+                None,
+                None,
             ),
         ],
         choices: vec![choice("hole", "Hole", &["pilot", "through", "none"])],
@@ -408,6 +421,19 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
                 ));
             }
             _ => {}
+        }
+        // Tip fillet: the shank top's outer edge, last (exact cap-loop blend).
+        let tip = p("tip_radius")?;
+        if tip > 0.0 {
+            ops.push(Op::EdgeLoop {
+                id: id + 30,
+                of: id,
+                end: true,
+                blend: rcad_plugin::Blend::Fillet,
+                size: tip,
+                holes: false,
+                label: lbl("tip fillet"),
+            });
         }
         if let Some(m) = mate {
             mate_ops(req, &mut ops, id, s.frame.point(*pt, top), &s.frame, m, i)?;

@@ -319,7 +319,10 @@ fn example_vent_slots_plugin_builds_the_expected_slots() {
             taper_deg,
             mode,
             ..
-        } = op;
+        } = op
+        else {
+            panic!("slot {i} is not a prism: {op:?}");
+        };
         assert_eq!(*id as usize, i);
         assert_eq!(body, "face");
         assert_eq!(*frame, face_frame());
@@ -399,7 +402,9 @@ fn example_vent_slots_plugin_handles_depth_single_slots_and_refusals() {
         p.build(r)
             .unwrap()
             .iter()
-            .map(|Op::Prism { id, .. }| *id)
+            .map(|op| match op {
+                Op::Prism { id, .. } | Op::EdgeLoop { id, .. } => *id,
+            })
             .collect()
     };
     assert_eq!(ids(&example_request(&p, &[])), vec![0, 1, 2, 3, 4]);

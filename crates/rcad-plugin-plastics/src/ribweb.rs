@@ -5,7 +5,9 @@
 //! * **Rib**: thickness across the sketch plane (`symmetric` about it, or
 //!   `one_side` on its normal side), material grown in the plane from the
 //!   line by `depth` to its `left`/`right` (left: sketch normal × line
-//!   direction). Draft narrows the rib towards its far edge.
+//!   direction), or `to_next`: to the nearest planar face of the body in
+//!   that direction, along the whole line (sunk 0.2 mm into it). Draft
+//!   narrows the rib towards its far edge.
 //! * **Web**: thickness in the sketch plane across the line, material grown
 //!   along the sketch normal (`flip`: against it) by `depth`, or `to_next`:
 //!   to the nearest face of the sketch's body facing it (sunk 0.2 mm into
@@ -75,7 +77,10 @@ pub fn rib_schema() -> FeatureSchema {
         "rib",
         "Rib",
         "Thin wall grown in the sketch plane from open sketch lines",
-        vec![choice("side", "Direction", &["left", "right"])],
+        vec![
+            choice("side", "Direction", &["left", "right"]),
+            choice("extent", "Extent", &["distance", "to_next"]),
+        ],
     )
 }
 
@@ -248,10 +253,46 @@ pub fn build_rib(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
     );
     let sym = req.choice("thickness_side")? == "symmetric";
     let left = req.choice("side")? == "left";
+    let to_next = req.choice("extent")? == "to_next";
+    let faces: &[rcad_plugin::PlanarFace] = if req.has("body") {
+        &req.body("body")?.faces
+    } else {
+        &s.faces
+    };
     let mut ops = Vec::new();
     for (i, (pa, pb, ea, eb)) in lines(f, s, t)?.into_iter().enumerate() {
         let l = line(f, pa, pb, ea, eb)?;
         let label = format!("rib line {}", i + 1);
+        let depth = if to_next {
+            // Rays from points along the line in the growth direction to the
+            // nearest planar face facing them; the farthest hit, so the rib
+            // reaches that face along its whole length, sunk into it.
+            let dir = if left {
+                l.left(&s.frame)
+            } else {
+                scale(l.left(&s.frame), -1.0)
+            };
+            let mut far: f64 = 0.0;
+            // Interior samples: an end on a wall would hit that wall's edge.
+            for k in 0..8 {
+                let p = s
+                    .frame
+                    .point(l.at(l.len * (k as f64 + 0.5) / 8.0, 0.0), 0.0);
+                let hit = rcad_plugin::geom::ray_to_face(faces, p, dir, EPS).ok_or_else(|| {
+                    invalid(
+                        f,
+                        format!(
+                            "to next: no planar face of the body in the rib's direction from rib line {}",
+                            i + 1
+                        ),
+                    )
+                })?;
+                far = far.max(hit);
+            }
+            far + SINK
+        } else {
+            depth
+        };
         let (w0, w1) = if left { (0.0, depth) } else { (-depth, 0.0) };
         if a == 0.0 {
             let span = if sym { (-t / 2.0, t / 2.0) } else { (0.0, t) };

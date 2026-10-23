@@ -708,6 +708,63 @@ pub fn parallel_faces(body: &Body, frame: &Frame) -> Result<Vec<ParallelFace>> {
     })
 }
 
+/// A planar face of a body: a point of its plane, its outward unit normal,
+/// and its boundary loops sampled 16 times per edge (world mm; outer loop
+/// first by area, then holes), for ray queries ("to next").
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PlanarFaceOutline {
+    pub point: [f64; 3],
+    pub normal: [f64; 3],
+    pub loops: Vec<Vec<[f64; 3]>>,
+}
+
+/// Every planar face of `body` with its sampled boundary loops.
+pub fn planar_face_outlines(body: &Body) -> Result<Vec<PlanarFaceOutline>> {
+    guarded("planar_face_outlines", || {
+        let mut out = Vec::new();
+        for f in body.solid.face_iter() {
+            let Surface::Plane(pl) = f.surface() else {
+                continue;
+            };
+            let mut n = pl.normal();
+            if !f.orientation() {
+                n = -n;
+            }
+            let o = pl.origin();
+            let mut loops: Vec<(f64, Vec<[f64; 3]>)> = Vec::new();
+            for w in f.boundaries() {
+                let mut pts = Vec::new();
+                for e in w.edge_iter() {
+                    let cv = e.curve();
+                    let (t0, t1) = cv.range_tuple();
+                    for i in 0..16 {
+                        let p = cv.subs(t0 + (t1 - t0) * i as f64 / 16.0);
+                        pts.push([p.x, p.y, p.z]);
+                    }
+                }
+                // Area magnitude (Newell) for ordering outer first.
+                let mut a = Vector3::new(0.0, 0.0, 0.0);
+                for i in 0..pts.len() {
+                    let (p, q) = (pts[i], pts[(i + 1) % pts.len()]);
+                    a += Vector3::new(
+                        (p[1] - q[1]) * (p[2] + q[2]),
+                        (p[2] - q[2]) * (p[0] + q[0]),
+                        (p[0] - q[0]) * (p[1] + q[1]),
+                    );
+                }
+                loops.push((a.magnitude(), pts));
+            }
+            loops.sort_by(|a, b| b.0.total_cmp(&a.0));
+            out.push(PlanarFaceOutline {
+                point: [o.x, o.y, o.z],
+                normal: [n.x, n.y, n.z],
+                loops: loops.into_iter().map(|l| l.1).collect(),
+            });
+        }
+        out
+    })
+}
+
 /// An inner boundary loop (hole outline) of a planar face perpendicular to Z.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InnerLoop {

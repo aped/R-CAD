@@ -454,11 +454,69 @@ pub fn next_above(planes: &[ParallelPlane], h: f64, eps: f64) -> Option<f64> {
         .fold(None, |m: Option<f64>, x| Some(m.map_or(x, |m| m.min(x))))
 }
 
-/// A resolved body: id and world bounding box (`[min, max]`).
+/// A resolved body: id, world bounding box (`[min, max]`) and its planar
+/// faces (for "to next" ray queries, [`ray_to_face`]).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BodyGeom {
     pub body: u32,
     pub bounds: [[f64; 3]; 2],
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub faces: Vec<PlanarFace>,
+}
+
+/// A planar face of a body: a point of its plane, its outward unit normal
+/// and its boundary loops (world mm, sampled along curved edges; outer loop
+/// first, then holes).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PlanarFace {
+    pub point: [f64; 3],
+    pub normal: [f64; 3],
+    pub loops: Vec<Vec<[f64; 3]>>,
+}
+
+/// Distance from `p` along unit `d` to the nearest planar face that faces
+/// the ray (outward normal against `d`) and contains the hit point (inside
+/// its outer loop, outside its holes), beyond `eps`. Curved faces are not
+/// seen.
+pub fn ray_to_face(faces: &[PlanarFace], p: [f64; 3], d: [f64; 3], eps: f64) -> Option<f64> {
+    let mut best: Option<f64> = None;
+    for f in faces {
+        let dn = dot(d, f.normal);
+        if dn > -1e-9 {
+            continue;
+        }
+        let t = dot(sub(f.point, p), f.normal) / dn;
+        if t <= eps || best.is_some_and(|b| t >= b) {
+            continue;
+        }
+        let hit = add(p, scale(d, t));
+        let Some(fr) = Frame::from_normal(f.point, f.normal, [1.0, 0.0, 0.0]) else {
+            continue;
+        };
+        let to2 = |q: &[f64; 3]| fr.local(*q).0;
+        let h = to2(&hit);
+        let inside = |l: &Vec<[f64; 3]>| {
+            let pts: Vec<[f64; 2]> = l.iter().map(to2).collect();
+            let n = pts.len();
+            let mut c = false;
+            for i in 0..n {
+                let (a, b) = (pts[i], pts[(i + 1) % n]);
+                if (a[1] > h[1]) != (b[1] > h[1])
+                    && h[0] < a[0] + (h[1] - a[1]) * (b[0] - a[0]) / (b[1] - a[1])
+                {
+                    c = !c;
+                }
+            }
+            c
+        };
+        let Some((outer, holes)) = f.loops.split_first() else {
+            continue;
+        };
+        if inside(outer) && !holes.iter().any(inside) {
+            best = Some(t);
+        }
+    }
+    best
 }
 
 /// A curve of a resolved sketch, in the sketch's plane coordinates.
@@ -496,6 +554,9 @@ pub struct SketchGeom {
     /// [`ParallelPlane`]); empty without a body.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub parallel: Vec<ParallelPlane>,
+    /// Every planar face of `body` (see [`PlanarFace`]); empty without a body.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub faces: Vec<PlanarFace>,
 }
 
 /// Geometry of one input as resolved at this point of the history.

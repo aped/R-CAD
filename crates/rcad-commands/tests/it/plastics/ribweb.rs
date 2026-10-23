@@ -191,3 +191,46 @@ fn to_next_only_sees_faces_under_the_web() {
         "web to the floor",
     );
 }
+
+#[test]
+fn a_rib_to_next_reaches_the_floor_along_its_line() {
+    let (mut s, _) = open_box();
+    // XZ plane, line at Z = 15 spanning the cavity (x ±28): the rib grows
+    // down to the floor's top (z = 2), 13 deep, sunk 0.2 into it.
+    let sk = line_sketch(
+        &mut s,
+        SketchPlane::WorldXZ,
+        &[([-28.0, 15.0], [28.0, 15.0])],
+    );
+    ok(
+        &mut s,
+        feature(
+            "rib",
+            &[("sketch", sketch_in(sk)), ("body", body_in())],
+            &[("thickness", 2.0), ("draft_deg", 0.0)],
+            &[("side", "right"), ("extent", "to_next")],
+        ),
+    );
+    assert_close(
+        vol(&s, BodyId(1)),
+        BOX + 56.0 * 2.0 * 13.0,
+        1e-6,
+        "rib to the floor",
+    );
+    // Growing up instead there is no face before the open top: refused.
+    let sk2 = line_sketch(
+        &mut s,
+        SketchPlane::WorldXZ,
+        &[([-10.0, 15.0], [10.0, 15.0])],
+    );
+    let m = err(
+        &mut s,
+        feature(
+            "rib",
+            &[("sketch", sketch_in(sk2)), ("body", body_in())],
+            &[("draft_deg", 0.0)],
+            &[("side", "left"), ("extent", "to_next")],
+        ),
+    );
+    assert!(m.contains("no planar face"), "{m}");
+}

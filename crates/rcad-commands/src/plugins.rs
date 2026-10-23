@@ -428,6 +428,7 @@ fn analysis_inputs(
                 rp::Resolved::Body(rp::BodyGeom {
                     body: body.0,
                     bounds: [bb.min, bb.max],
+                    faces: vec![],
                 })
             }
             (rp::InputKind::Face, PluginInput::Face { plane }) => {

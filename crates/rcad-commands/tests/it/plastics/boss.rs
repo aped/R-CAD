@@ -281,3 +281,30 @@ fn ribs_on_a_drafted_shank_are_refused_by_name() {
     );
     assert!(m.contains("drafted shank"), "{m}");
 }
+
+#[test]
+fn a_tip_fillet_rounds_the_shank_top_exactly() {
+    let (mut s, _, sk) = setup();
+    ok(
+        &mut s,
+        feature(
+            "boss",
+            &[("sketch", sketch_in(sk))],
+            &[("height", 8.0), ("draft_deg", 0.0), ("tip_radius", 0.5)],
+            &[],
+        ),
+    );
+    // Removed per boss (docs/FILLETS.md): A·P − M·Σφ, a full circle of R = 3.
+    let r: f64 = 0.5;
+    let (a, m) = (r * r * (1.0 - PI / 4.0), r.powi(3) * (5.0 / 6.0 - PI / 4.0));
+    let removed = a * 2.0 * PI * 3.0 - m * 2.0 * PI;
+    let want = PLATE + 2.0 * (PI * 9.0 * 8.0 - PI * 1.25f64.powi(2) * 6.0 - removed);
+    assert_close(vol(&s, BodyId(1)), want, 1e-6, "volume");
+    // The sharp top corner is gone; the wall below the fillet is kept.
+    let pr = probe(
+        &s,
+        BodyId(1),
+        &[[-15.0 + 2.95, 0.0, 11.95], [-15.0 + 2.95, 0.0, 11.0]],
+    );
+    assert_eq!(pr, [Some(false), Some(true)]);
+}
