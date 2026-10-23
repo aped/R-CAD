@@ -268,21 +268,6 @@ fn invalid_bosses_are_refused_and_leave_the_document_unchanged() {
 }
 
 #[test]
-fn ribs_on_a_drafted_shank_are_refused_by_name() {
-    let (mut s, _, sk) = setup();
-    let m = err(
-        &mut s,
-        feature(
-            "boss",
-            &[("sketch", sketch_in(sk))],
-            &[("draft_deg", 1.0), ("rib_count", 4.0)],
-            &[],
-        ),
-    );
-    assert!(m.contains("drafted shank"), "{m}");
-}
-
-#[test]
 fn a_tip_fillet_rounds_the_shank_top_exactly() {
     let (mut s, _, sk) = setup();
     ok(
@@ -420,4 +405,19 @@ fn a_root_fillet_ring_follows_pappus() {
         &[[-15.0 + 3.1, 0.0, 4.1], [-15.0 + 3.9, 0.0, 4.9]],
     );
     assert_eq!(pr, [Some(true), Some(false)]);
+}
+
+#[test]
+fn ribs_on_a_drafted_shank_are_refused_by_name() {
+    let (mut s, _, sk) = setup();
+    let m = err(
+        &mut s,
+        feature(
+            "boss",
+            &[("sketch", sketch_in(sk))],
+            &[("draft_deg", 1.0), ("rib_count", 4.0)],
+            &[],
+        ),
+    );
+    assert!(m.contains("drafted shank"), "{m}");
 }

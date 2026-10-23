@@ -242,17 +242,17 @@ pub fn schema() -> FeatureSchema {
     }
 }
 
-/// Gusset section in (radial, height): flat top `rh` from the axis to
+/// Gusset section in (radial, height): flat top `rh` from `r_in` to
 /// `rl - ch`, sloping to `rtip` at `rl`, sunk [`SINK`] below the base.
-fn rib_section(rl: f64, ch: f64, rh: f64, rtip: f64) -> Vec<[f64; 2]> {
-    let mut v = vec![[0.0, -SINK], [rl, -SINK], [rl, rtip]];
+fn rib_section(r_in: f64, rl: f64, ch: f64, rh: f64, rtip: f64) -> Vec<[f64; 2]> {
+    let mut v = vec![[r_in, -SINK], [rl, -SINK], [rl, rtip]];
     if ch > EPS && (rh - rtip).abs() > EPS {
         v.push([rl - ch, rh]);
     } else if (rh - rtip).abs() > EPS {
         // No chamfer: a step down at the end.
         v.push([rl, rh]);
     }
-    v.push([0.0, rh]);
+    v.push([r_in, rh]);
     v
 }
 
@@ -318,6 +318,7 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
                  ribs to a cone); set draft_deg to 0 or rib_count to 0",
             ));
         }
+
         if rl <= d / 2.0 + EPS {
             return Err(invalid(
                 F,
@@ -371,17 +372,19 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
         let top = base + h;
         let at = s.frame.at(*pt).offset(base);
         let lbl = |w: &str| format!("boss {}: {w}", i + 1);
-        ops.push(prism(
-            id,
-            "sketch",
-            at,
-            circle(d / 2.0),
-            vec![],
-            (0.0, h),
-            da.to_degrees(),
-            Mode::Join,
-            lbl("shank"),
-        ));
+        {
+            ops.push(prism(
+                id,
+                "sketch",
+                at,
+                circle(d / 2.0),
+                vec![],
+                (0.0, h),
+                da.to_degrees(),
+                Mode::Join,
+                lbl("shank"),
+            ));
+        }
         if ribs > 0 {
             let total = p("rib_total_deg")?.to_radians();
             let step = if (total - std::f64::consts::TAU).abs() < 1e-9 {
@@ -392,10 +395,30 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
                 0.0
             };
             let a0 = p("rib_angle_deg")?.to_radians();
+            // Gussets start where neighbours no longer meet (inside the
+            // shank, so nothing changes outside it): coplanar tops crossing
+            // at the axis would defeat the booleans.
+            let gap = if ribs > 1 {
+                step.min(std::f64::consts::TAU - step * (ribs - 1) as f64)
+                    .max(step)
+            } else {
+                std::f64::consts::PI
+            };
+            let r_in = if ribs > 1 {
+                1.01 * rt / 2.0 / (gap.min(std::f64::consts::PI) / 2.0).tan()
+            } else {
+                0.0
+            };
+            if r_in >= 0.9 * (d / 2.0 - h * da.tan()) {
+                return Err(unsupported(
+                    F,
+                    "the gussets are too thick or too many for the shank",
+                ));
+            }
             for k in 0..ribs {
                 let f = standing(&s.frame.offset(base), *pt, a0 + step * k as f64);
                 let section = Profile::Polygon {
-                    points: rib_section(rl, p("rib_chamfer")?, rh, rtip),
+                    points: rib_section(r_in, rl, p("rib_chamfer")?, rh, rtip),
                 };
                 ops.push(prism(
                     id + 2 + k as u32,
