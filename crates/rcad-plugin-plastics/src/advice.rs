@@ -56,14 +56,15 @@
 //! Mesh-derived numbers approximate the exact body within the tessellation's
 //! chord tolerance (reported in `approximation`); exact draft values are
 //! marked `exact: true`. The report layout is documented on [`analyze`].
-use crate::{choice, input, param};
-use rcad_plugin::geom::{add, cross, dot, norm, scale, sub};
-use rcad_plugin::schema::AnalysisSchema;
-use rcad_plugin::{
-    AnalysisRequest, BodyMesh, InputKind, ParamKind, PluginError, Resolved, Surface,
+use crate::mesh_query::{
+    ANGLE_TOL, Bvh, Prepared, REL_MIN_HIT, direction_of, prepare, pt, surface_name, unit,
 };
+use crate::{choice, input, param};
+use rcad_plugin::geom::{add, cross, dot, norm, scale};
+use rcad_plugin::schema::AnalysisSchema;
+use rcad_plugin::{AnalysisRequest, InputKind, ParamKind, PluginError, Surface};
 use serde_json::{Value, json};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 pub fn schema() -> AnalysisSchema {
     AnalysisSchema {
@@ -137,19 +138,8 @@ pub fn schema() -> AnalysisSchema {
 const NAME: &str = "design advice";
 /// Locations listed per check.
 const MAX_LOCATIONS: usize = 10;
-/// Angular tolerance (radians, on `n·p` or `|axis × p|`) of "parallel to the
-/// pull", of the vertical side and of the release test.
-const ANGLE_TOL: f64 = 1e-9;
-/// Barycentric slack of ray/triangle hits (edges count as hits).
-const BARY_TOL: f64 = 1e-10;
-/// Ray start offset from the surface, relative to the bounding-box diagonal.
-const REL_OFFSET: f64 = 1e-6;
-/// Hit-distance floor, relative to the bounding-box diagonal.
-const REL_MIN_HIT: f64 = 1e-9;
 /// Largest bend (degrees) between adjacent triangles compared for variation.
 const VARIATION_MAX_BEND_DEG: f64 = 30.0;
-/// Triangles per BVH leaf.
-const LEAF: usize = 4;
 
 fn bad(m: impl std::fmt::Display) -> PluginError {
     PluginError::Input(format!("{NAME}: {m}"))
@@ -164,11 +154,7 @@ struct Params {
 }
 
 fn param_of(req: &AnalysisRequest, n: &str) -> Result<f64, PluginError> {
-    req.params
-        .get(n)
-        .copied()
-        .filter(|v| v.is_finite())
-        .ok_or_else(|| bad(format!("parameter '{n}' is missing or not finite")))
+    crate::mesh_query::param_of(req, n).map_err(bad)
 }
 
 fn params(req: &AnalysisRequest) -> Result<Params, PluginError> {
@@ -191,360 +177,6 @@ fn params(req: &AnalysisRequest) -> Result<Params, PluginError> {
     Ok(p)
 }
 
-fn unit(v: [f64; 3]) -> Option<[f64; 3]> {
-    let l = norm(v);
-    (l.is_finite() && l > 0.0).then(|| scale(v, 1.0 / l))
-}
-
-fn pull_of(req: &AnalysisRequest) -> Result<([f64; 3], &'static str), PluginError> {
-    match req.inputs.get("pull") {
-        Some(Resolved::Face(f)) => unit(f.frame.z)
-            .map(|p| (p, "face"))
-            .ok_or_else(|| bad("the pull face's normal is not a direction")),
-        Some(_) => Err(bad("input 'pull' must be a face")),
-        None => {
-            let axis = req
-                .choices
-                .get("pull_axis")
-                .ok_or_else(|| bad("choice 'pull_axis' is missing"))?;
-            let p = match axis.as_str() {
-                "+x" => [1.0, 0.0, 0.0],
-                "-x" => [-1.0, 0.0, 0.0],
-                "+y" => [0.0, 1.0, 0.0],
-                "-y" => [0.0, -1.0, 0.0],
-                "+z" => [0.0, 0.0, 1.0],
-                "-z" => [0.0, 0.0, -1.0],
-                a => return Err(bad(format!("unknown pull axis '{a}'"))),
-            };
-            Ok((p, "axis"))
-        }
-    }
-}
-
-/// A checked mesh with per-triangle geometry.
-struct Prepared<'a> {
-    m: &'a BodyMesh,
-    tri: Vec<[usize; 3]>,
-    face: Vec<usize>,
-    /// Unit normal; zero where `!ok`.
-    normal: Vec<[f64; 3]>,
-    area: Vec<f64>,
-    centroid: Vec<[f64; 3]>,
-    /// Non-degenerate.
-    ok: Vec<bool>,
-    diag: f64,
-    /// Every edge shared by exactly two oppositely wound triangles.
-    closed: bool,
-    /// Undirected edge -> the triangles on it.
-    edges: HashMap<(usize, usize), Vec<usize>>,
-}
-
-impl Prepared<'_> {
-    fn vert(&self, t: usize) -> [[f64; 3]; 3] {
-        self.tri[t].map(|v| self.m.vertices[v])
-    }
-}
-
-fn prepare(m: &BodyMesh) -> Result<Prepared<'_>, PluginError> {
-    let b = m.body;
-    if m.triangles.is_empty() || m.vertices.is_empty() {
-        return Err(bad(format!("body {b}: empty mesh")));
-    }
-    if m.tri_face.len() != m.triangles.len() {
-        return Err(bad(format!(
-            "body {b}: {} face indices for {} triangles",
-            m.tri_face.len(),
-            m.triangles.len()
-        )));
-    }
-    if !(m.chord.is_finite() && m.chord >= 0.0) {
-        return Err(bad(format!("body {b}: chord tolerance {}", m.chord)));
-    }
-    if let Some(i) = m
-        .faces
-        .iter()
-        .position(|f| !(f.area.is_finite() && f.area >= 0.0))
-    {
-        return Err(bad(format!(
-            "body {b}: face {i} has area {}",
-            m.faces[i].area
-        )));
-    }
-    if m.vertices.iter().flatten().any(|v| !v.is_finite()) {
-        return Err(bad(format!("body {b}: non-finite vertex")));
-    }
-    let nv = m.vertices.len();
-    let mut tri = Vec::with_capacity(m.triangles.len());
-    for (i, t) in m.triangles.iter().enumerate() {
-        let t = t.map(|v| v as usize);
-        if t.iter().any(|&v| v >= nv) {
-            return Err(bad(format!(
-                "body {b}: triangle {i} has a vertex out of range"
-            )));
-        }
-        tri.push(t);
-    }
-    let mut face = Vec::with_capacity(m.tri_face.len());
-    for (i, &f) in m.tri_face.iter().enumerate() {
-        let f = f as usize;
-        if f >= m.faces.len() {
-            return Err(bad(format!(
-                "body {b}: triangle {i} lies on missing face {f}"
-            )));
-        }
-        face.push(f);
-    }
-    let mut lo = [f64::INFINITY; 3];
-    let mut hi = [f64::NEG_INFINITY; 3];
-    for v in &m.vertices {
-        for a in 0..3 {
-            lo[a] = lo[a].min(v[a]);
-            hi[a] = hi[a].max(v[a]);
-        }
-    }
-    let diag = norm(sub(hi, lo));
-    if !(diag.is_finite() && diag > 0.0) {
-        return Err(bad(format!("body {b}: mesh has no extent")));
-    }
-    let n = tri.len();
-    let mut normal = Vec::with_capacity(n);
-    let mut area = Vec::with_capacity(n);
-    let mut centroid = Vec::with_capacity(n);
-    let mut ok = Vec::with_capacity(n);
-    let mut volume = 0.0;
-    for t in &tri {
-        let [p0, p1, p2] = t.map(|v| m.vertices[v]);
-        let c = cross(sub(p1, p0), sub(p2, p0));
-        let l = norm(c);
-        let good = l > 1e-12 * diag * diag;
-        normal.push(if good { scale(c, 1.0 / l) } else { [0.0; 3] });
-        area.push(if good { 0.5 * l } else { 0.0 });
-        centroid.push(scale(add(add(p0, p1), p2), 1.0 / 3.0));
-        ok.push(good);
-        let (q0, q1, q2) = (sub(p0, lo), sub(p1, lo), sub(p2, lo));
-        volume += dot(q0, cross(q1, q2)) / 6.0;
-    }
-    if !ok.iter().any(|&g| g) {
-        return Err(bad(format!("body {b}: every triangle is degenerate")));
-    }
-    if volume <= 0.0 {
-        return Err(bad(format!(
-            "body {b}: mesh is not an outward-oriented closed solid (signed volume {volume})"
-        )));
-    }
-    let mut edges: HashMap<(usize, usize), Vec<usize>> = HashMap::new();
-    let mut winding: HashMap<(usize, usize), i64> = HashMap::new();
-    for (i, t) in tri.iter().enumerate() {
-        for k in 0..3 {
-            let (a, c) = (t[k], t[(k + 1) % 3]);
-            if a == c {
-                continue;
-            }
-            let key = (a.min(c), a.max(c));
-            edges.entry(key).or_default().push(i);
-            *winding.entry(key).or_default() += if a < c { 1 } else { -1 };
-        }
-    }
-    let closed = edges
-        .iter()
-        .all(|(e, ts)| ts.len() == 2 && winding.get(e) == Some(&0));
-    Ok(Prepared {
-        m,
-        tri,
-        face,
-        normal,
-        area,
-        centroid,
-        ok,
-        diag,
-        closed,
-        edges,
-    })
-}
-
-/// Möller–Trumbore: distance along unit `d` from `o` to the triangle, edges
-/// included; None when parallel or missed.
-fn tri_hit(o: [f64; 3], d: [f64; 3], [v0, v1, v2]: [[f64; 3]; 3]) -> Option<f64> {
-    let e1 = sub(v1, v0);
-    let e2 = sub(v2, v0);
-    let pv = cross(d, e2);
-    let det = dot(e1, pv);
-    if det.abs() <= 1e-14 * norm(e1) * norm(e2) {
-        return None;
-    }
-    let inv = 1.0 / det;
-    let tv = sub(o, v0);
-    let u = dot(tv, pv) * inv;
-    if !(-BARY_TOL..=1.0 + BARY_TOL).contains(&u) {
-        return None;
-    }
-    let qv = cross(tv, e1);
-    let v = dot(d, qv) * inv;
-    if v < -BARY_TOL || u + v > 1.0 + BARY_TOL {
-        return None;
-    }
-    Some(dot(e2, qv) * inv)
-}
-
-/// Entry distance (≥ 0) of the ray into the box, None when it misses.
-fn slab(lo: [f64; 3], hi: [f64; 3], o: [f64; 3], d: [f64; 3]) -> Option<f64> {
-    let (mut tn, mut tf) = (f64::NEG_INFINITY, f64::INFINITY);
-    for a in 0..3 {
-        if d[a] == 0.0 {
-            if o[a] < lo[a] || o[a] > hi[a] {
-                return None;
-            }
-            continue;
-        }
-        let inv = 1.0 / d[a];
-        let (t0, t1) = ((lo[a] - o[a]) * inv, (hi[a] - o[a]) * inv);
-        let (t0, t1) = if t0 <= t1 { (t0, t1) } else { (t1, t0) };
-        tn = tn.max(t0);
-        tf = tf.min(t1);
-        if tn > tf {
-            return None;
-        }
-    }
-    (tf >= 0.0).then_some(tn.max(0.0))
-}
-
-#[derive(Clone, Copy)]
-struct Node {
-    lo: [f64; 3],
-    hi: [f64; 3],
-    /// Leaf: first index into `order`; inner node: index of the first child
-    /// (the second follows it).
-    first: usize,
-    /// Triangles of a leaf; 0 for an inner node.
-    count: usize,
-}
-
-/// Bounding-volume hierarchy over the non-degenerate triangles: median split
-/// on the widest centroid axis, so the depth is at most log2(n) + 1.
-struct Bvh {
-    nodes: Vec<Node>,
-    order: Vec<usize>,
-}
-
-impl Bvh {
-    fn new(pm: &Prepared) -> Bvh {
-        let order: Vec<usize> = (0..pm.tri.len()).filter(|&t| pm.ok[t]).collect();
-        let mut b = Bvh {
-            nodes: Vec::with_capacity(2 * order.len() / LEAF + 2),
-            order,
-        };
-        if !b.order.is_empty() {
-            b.nodes.push(Node {
-                lo: [0.0; 3],
-                hi: [0.0; 3],
-                first: 0,
-                count: 0,
-            });
-            let n = b.order.len();
-            b.split(pm, 0, 0, n, REL_MIN_HIT * pm.diag);
-        }
-        b
-    }
-
-    fn split(&mut self, pm: &Prepared, node: usize, start: usize, end: usize, pad: f64) {
-        let mut lo = [f64::INFINITY; 3];
-        let mut hi = [f64::NEG_INFINITY; 3];
-        let mut clo = [f64::INFINITY; 3];
-        let mut chi = [f64::NEG_INFINITY; 3];
-        for &t in &self.order[start..end] {
-            for v in pm.vert(t) {
-                for a in 0..3 {
-                    lo[a] = lo[a].min(v[a]);
-                    hi[a] = hi[a].max(v[a]);
-                }
-            }
-            let c = pm.centroid[t];
-            for a in 0..3 {
-                clo[a] = clo[a].min(c[a]);
-                chi[a] = chi[a].max(c[a]);
-            }
-        }
-        self.nodes[node].lo = lo.map(|v| v - pad);
-        self.nodes[node].hi = hi.map(|v| v + pad);
-        let ext = [chi[0] - clo[0], chi[1] - clo[1], chi[2] - clo[2]];
-        let axis = if ext[0] >= ext[1] && ext[0] >= ext[2] {
-            0
-        } else if ext[1] >= ext[2] {
-            1
-        } else {
-            2
-        };
-        if end - start <= LEAF || ext[axis] <= 0.0 {
-            self.nodes[node].first = start;
-            self.nodes[node].count = end - start;
-            return;
-        }
-        let mid = start + (end - start) / 2;
-        let cen = &pm.centroid;
-        self.order[start..end]
-            .select_nth_unstable_by(mid - start, |&a, &b| cen[a][axis].total_cmp(&cen[b][axis]));
-        let child = self.nodes.len();
-        let blank = self.nodes[node];
-        self.nodes.push(blank);
-        self.nodes.push(blank);
-        self.nodes[node].first = child;
-        self.nodes[node].count = 0;
-        self.split(pm, child, start, mid, pad);
-        self.split(pm, child + 1, mid, end, pad);
-    }
-
-    /// The nearest (with `any`: some) triangle other than `exclude` hit
-    /// beyond `tmin` whose index `accept`s, with the hit distance.
-    #[allow(clippy::too_many_arguments)]
-    fn cast(
-        &self,
-        pm: &Prepared,
-        o: [f64; 3],
-        d: [f64; 3],
-        tmin: f64,
-        exclude: usize,
-        any: bool,
-        accept: impl Fn(usize) -> bool,
-    ) -> Option<(f64, usize)> {
-        if self.nodes.is_empty() {
-            return None;
-        }
-        let mut best = f64::INFINITY;
-        let mut hit = None;
-        let mut stack = Vec::with_capacity(64);
-        stack.push(0usize);
-        while let Some(n) = stack.pop() {
-            let node = self.nodes[n];
-            match slab(node.lo, node.hi, o, d) {
-                Some(tn) if tn <= best => {}
-                _ => continue,
-            }
-            if node.count == 0 {
-                stack.push(node.first);
-                stack.push(node.first + 1);
-                continue;
-            }
-            for &t in &self.order[node.first..node.first + node.count] {
-                if t == exclude {
-                    continue;
-                }
-                if let Some(h) = tri_hit(o, d, pm.vert(t))
-                    && h > tmin
-                    && h < best
-                    && accept(t)
-                {
-                    best = h;
-                    hit = Some((h, t));
-                    if any {
-                        return hit;
-                    }
-                }
-            }
-        }
-        hit
-    }
-}
-
 fn side_of(d: f64) -> &'static str {
     if d.abs() <= ANGLE_TOL {
         "vertical"
@@ -557,15 +189,6 @@ fn side_of(d: f64) -> &'static str {
 
 fn draft_deg(d: f64) -> f64 {
     d.abs().min(1.0).asin().to_degrees()
-}
-
-fn surface_name(s: &Surface) -> &'static str {
-    match s {
-        Surface::Plane { .. } => "plane",
-        Surface::Cylinder { .. } => "cylinder",
-        Surface::Cone { .. } => "cone",
-        Surface::Other => "other",
-    }
 }
 
 /// Exact draft of a face (degrees, and the side when the surface fixes it),
@@ -633,10 +256,6 @@ struct FaceAcc {
     sides: [bool; 3],
 }
 
-fn pt(v: [f64; 3]) -> Value {
-    json!([v[0], v[1], v[2]])
-}
-
 /// Sorted, truncated location list of triangle findings.
 fn locations(pm: &Prepared, mut v: Vec<At>, ascending: bool) -> Value {
     v.sort_by(|a, b| {
@@ -681,18 +300,10 @@ fn locations(pm: &Prepared, mut v: Vec<At>, ascending: bool) -> Value {
 /// exist (no resolved thickness) are null.
 pub fn analyze(req: &AnalysisRequest) -> Result<Value, PluginError> {
     let prm = params(req)?;
-    let body = match req.inputs.get("body") {
-        Some(Resolved::Body(b)) => b.body,
-        Some(_) => return Err(bad("input 'body' must be a body")),
-        None => return Err(bad("input 'body' is missing")),
-    };
-    let mesh = req
-        .bodies
-        .iter()
-        .find(|m| m.body == body)
-        .ok_or_else(|| bad(format!("no mesh of body {body}")))?;
-    let (p, pull_source) = pull_of(req)?;
-    let pm = prepare(mesh)?;
+    let mesh = crate::mesh_query::body_mesh(req).map_err(bad)?;
+    let body = mesh.body;
+    let (p, pull_source) = direction_of(req, "pull", "pull_axis").map_err(bad)?;
+    let pm = prepare(mesh).map_err(bad)?;
     let nt = pm.tri.len();
     let nf = mesh.faces.len();
 
@@ -701,19 +312,9 @@ pub fn analyze(req: &AnalysisRequest) -> Result<Value, PluginError> {
     for (fi, f) in mesh.faces.iter().enumerate() {
         exact.push(exact_draft(&f.surface, p, fi)?);
     }
-    for t in (0..nt).filter(|&t| pm.ok[t]) {
-        if let Surface::Plane { normal } = mesh.faces[pm.face[t]].surface
-            && unit(normal).is_some_and(|n| dot(n, pm.normal[t]) < 0.5)
-        {
-            return Err(bad(format!(
-                "triangle {t} disagrees with the outward normal of plane face {}",
-                pm.face[t]
-            )));
-        }
-    }
+    pm.check_planes().map_err(bad)?;
 
     let bvh = Bvh::new(&pm);
-    let off = REL_OFFSET * pm.diag;
     let tiny = REL_MIN_HIT * pm.diag;
 
     // Thickness: inward ray to the nearest exit.
@@ -838,8 +439,7 @@ pub fn analyze(req: &AnalysisRequest) -> Result<Value, PluginError> {
             _ => 2,
         };
         fa.sides[side] = true;
-        let o = add(pm.centroid[t], scale(n, off));
-        let free = |dir: [f64; 3]| bvh.cast(&pm, o, dir, tiny, t, true, |_| true).is_none();
+        let free = |dir: [f64; 3]| bvh.unobstructed(&pm, t, dir);
         let released = (d >= -ANGLE_TOL && free(p)) || (d <= ANGLE_TOL && free(neg_p));
         if !released {
             undercut_area += pm.area[t];
