@@ -11,9 +11,9 @@
 //! <- {"ok": <report JSON>}        or {"error": "message"}
 //! -> {"method": "validate_data", "data": <JSON>}
 //! <- {"ok": null}                 or {"error": "message"}
-//! -> {"method": "data_effects", "data": <JSON>}
+//! -> {"method": "data_effects", "data": <JSON>, "components": {"<id>": [bodies]}}
 //! <- {"ok": DataEffects}
-//! -> {"method": "rule_symbols", "data": <JSON>, "body": 3}
+//! -> {"method": "rule_symbols", "data": <JSON>, "body": 3, "component": 1}
 //! <- {"ok": {"T": "ABS_T", ...}}
 //! ```
 //!
@@ -622,6 +622,32 @@ impl Plugin for ProcessPlugin {
             .ok()
             .and_then(|v| serde_json::from_value(v).ok())
             .unwrap_or_default()
+    }
+
+    fn rule_symbols_in(
+        &self,
+        data: &serde_json::Value,
+        at: &crate::RuleContext,
+    ) -> std::collections::BTreeMap<String, String> {
+        self.call(&serde_json::json!({
+            "method": "rule_symbols", "data": data, "body": at.body, "component": at.component
+        }))
+        .ok()
+        .and_then(|v| serde_json::from_value(v).ok())
+        .unwrap_or_default()
+    }
+
+    fn data_effects_in(
+        &self,
+        data: &serde_json::Value,
+        doc: &crate::DocContext,
+    ) -> crate::DataEffects {
+        self.call(&serde_json::json!({
+            "method": "data_effects", "data": data, "components": doc.components
+        }))
+        .ok()
+        .and_then(|v| serde_json::from_value(v).ok())
+        .unwrap_or_default()
     }
 
     fn rule_symbols(

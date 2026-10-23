@@ -145,6 +145,27 @@ impl Plugin for Plastics {
             .and_then(|d| d.rule_of(body).map(rules::Rule::symbols))
             .unwrap_or_default()
     }
+
+    fn rule_symbols_in(
+        &self,
+        data: &serde_json::Value,
+        at: &rcad_plugin::RuleContext,
+    ) -> BTreeMap<String, String> {
+        rules::PlasticData::parse(data)
+            .ok()
+            .and_then(|d| d.rule_at(at).map(rules::Rule::symbols))
+            .unwrap_or_default()
+    }
+
+    fn data_effects_in(
+        &self,
+        data: &serde_json::Value,
+        doc: &rcad_plugin::DocContext,
+    ) -> DataEffects {
+        rules::PlasticData::parse(data)
+            .map(|d| d.effects_in(doc))
+            .unwrap_or_default()
+    }
 }
 
 #[cfg(test)]

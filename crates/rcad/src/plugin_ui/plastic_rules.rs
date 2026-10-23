@@ -77,6 +77,8 @@ pub struct RulesForm {
     pub rules: Vec<RuleEdit>,
     /// Body id -> rule name, as loaded.
     pub bodies: BTreeMap<u32, String>,
+    /// Component id -> rule name, as loaded.
+    pub components: BTreeMap<u32, String>,
     /// The data the form was loaded from.
     pub base: serde_json::Value,
     /// Changed since loaded or stored.
@@ -95,6 +97,7 @@ impl RulesForm {
         RulesForm {
             rules: d.rules.iter().map(RuleEdit::from_rule).collect(),
             bodies: d.bodies,
+            components: d.components,
             base,
             edited: false,
             preset: PRESETS.first().map_or(String::new(), |p| p.0.to_string()),
@@ -129,17 +132,22 @@ impl RulesForm {
     }
 
     /// The data to store: the rules, and the assignments of rules that
-    /// still exist (renamed rules keep their bodies).
+    /// still exist (renamed rules keep their bodies and components).
     pub fn data(&self) -> serde_json::Value {
-        let mut bodies = BTreeMap::new();
-        for (b, n) in &self.bodies {
-            if let Some(r) = self.rules.iter().find(|r| r.was.as_deref() == Some(n)) {
-                bodies.insert(*b, r.name.trim().to_string());
-            }
-        }
+        let keep = |m: &BTreeMap<u32, String>| -> BTreeMap<u32, String> {
+            m.iter()
+                .filter_map(|(k, n)| {
+                    self.rules
+                        .iter()
+                        .find(|r| r.was.as_deref() == Some(n))
+                        .map(|r| (*k, r.name.trim().to_string()))
+                })
+                .collect()
+        };
         serde_json::to_value(PlasticData {
             rules: self.rules.iter().map(RuleEdit::to_rule).collect(),
-            bodies,
+            bodies: keep(&self.bodies),
+            components: keep(&self.components),
         })
         .unwrap_or(serde_json::Value::Null)
     }

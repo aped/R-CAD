@@ -148,7 +148,20 @@ impl PluginUi {
             .unwrap_or(serde_json::Value::Null);
         let symbols: BTreeMap<String, String> = match rcad_plugin::find(plugin) {
             Some(p) if !data.is_null() => p
-                .rule_symbols(&data, body.map(|b| b.0))
+                .rule_symbols_in(
+                    &data,
+                    &rcad_plugin::RuleContext {
+                        body: body.map(|b| b.0),
+                        component: body.and_then(|b| {
+                            summary
+                                .assembly
+                                .components
+                                .iter()
+                                .find(|c| c.bodies.contains(&b))
+                                .map(|c| c.id.0)
+                        }),
+                    },
+                )
                 .into_iter()
                 .filter(|(_, n)| summary.parameters.iter().any(|q| &q.name == n))
                 .collect(),

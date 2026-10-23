@@ -318,6 +318,41 @@ pub trait Plugin: Send + Sync {
         let _ = (data, body);
         BTreeMap::new()
     }
+
+    /// [`Plugin::rule_symbols`] for a body that may belong to an assembly
+    /// component (rules can be assigned to components, as in Fusion).
+    /// Hosts call this; the default ignores the component.
+    fn rule_symbols_in(
+        &self,
+        data: &serde_json::Value,
+        at: &RuleContext,
+    ) -> BTreeMap<String, String> {
+        self.rule_symbols(data, at.body)
+    }
+
+    /// [`Plugin::data_effects`] knowing the document's components (to
+    /// assign a component rule's material to its bodies). Hosts call this;
+    /// the default ignores the components.
+    fn data_effects_in(&self, data: &serde_json::Value, doc: &DocContext) -> DataEffects {
+        let _ = doc;
+        self.data_effects(data)
+    }
+}
+
+/// Where a new feature's rule is looked up: its body and that body's
+/// component (if any).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct RuleContext {
+    pub body: Option<u32>,
+    pub component: Option<u32>,
+}
+
+/// Document facts a plugin's data effects may depend on: each component's
+/// bodies.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct DocContext {
+    #[serde(default)]
+    pub components: BTreeMap<u32, Vec<u32>>,
 }
 
 /// A user parameter a plugin's data defines.

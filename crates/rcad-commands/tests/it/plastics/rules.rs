@@ -368,3 +368,68 @@ fn redefining_a_plugin_feature_edits_choices_and_inputs_in_one_step() {
     ok(&mut s, Command::Undo);
     assert_close(vol(&s, BodyId(1)), BOX + 56.0 * 2.0 * 18.0, 1e-6, "undone");
 }
+
+#[test]
+fn rules_assigned_to_a_component_reach_its_bodies() {
+    let (mut s, e) = open_box();
+    let c: Command =
+        serde_json::from_value(json!({"cmd": "create_component", "name": "Base", "bodies": [1]}))
+            .unwrap();
+    ok(&mut s, c);
+    let cid = s.summary().assembly.components[0].id.0;
+    ok(
+        &mut s,
+        Command::SetPluginData(SetPluginDataCmd {
+            plugin: "plastics".into(),
+            data: json!({
+                "rules": [{"name": "PP", "material": "pp", "values": {"T": "1.5 mm"}}],
+                "components": {cid.to_string(): "PP"}
+            }),
+        }),
+    );
+    let b = s
+        .summary()
+        .bodies
+        .into_iter()
+        .find(|b| b.id == BodyId(1))
+        .unwrap();
+    assert_eq!(b.material.and_then(|m| m.catalog).as_deref(), Some("pp"));
+    // A web on the component's body binds to the component's rule.
+    let f = web_cross(&mut s, e).feature.unwrap();
+    let fs = s
+        .summary()
+        .features
+        .into_iter()
+        .find(|x| x.id == f)
+        .unwrap();
+    assert_eq!(
+        fs.expressions.get("thickness").map(String::as_str),
+        Some("PP_T")
+    );
+    assert_close(
+        vol(&s, BodyId(1)),
+        BOX + 56.0 * 1.5 * 18.0,
+        1e-6,
+        "web at PP_T",
+    );
+    // A body's own assignment wins over its component's.
+    ok(
+        &mut s,
+        Command::SetPluginData(SetPluginDataCmd {
+            plugin: "plastics".into(),
+            data: json!({
+                "rules": [{"name": "PP", "material": "pp", "values": {"T": "1.5 mm"}},
+                          {"name": "ABS", "material": "abs", "values": {"T": "2 mm"}}],
+                "components": {cid.to_string(): "PP"},
+                "bodies": {"1": "ABS"}
+            }),
+        }),
+    );
+    let b = s
+        .summary()
+        .bodies
+        .into_iter()
+        .find(|b| b.id == BodyId(1))
+        .unwrap();
+    assert_eq!(b.material.and_then(|m| m.catalog).as_deref(), Some("abs"));
+}

@@ -19,6 +19,10 @@ pub struct PlasticData {
     /// Body id → rule name.
     #[serde(default)]
     pub bodies: BTreeMap<u32, String>,
+    /// Assembly component id → rule name (Fusion assigns rules to
+    /// components); a body's own assignment wins over its component's.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub components: BTreeMap<u32, String>,
 }
 
 /// One rule. Lengths in mm, angles in degrees; every value is an expression
@@ -181,6 +185,11 @@ impl PlasticData {
                 return bad(format!("body {b} is assigned to unknown rule '{n}'"));
             }
         }
+        for (c, n) in &self.components {
+            if !self.rules.iter().any(|r| &r.name == n) {
+                return bad(format!("component {c} is assigned to unknown rule '{n}'"));
+            }
+        }
         Ok(())
     }
 
@@ -191,6 +200,29 @@ impl PlasticData {
     /// The rule assigned to `body`.
     pub fn rule_of(&self, body: Option<u32>) -> Option<&Rule> {
         self.rule(self.bodies.get(&body?)?)
+    }
+
+    /// The rule of `body`, else of its component.
+    pub fn rule_at(&self, at: &rcad_plugin::RuleContext) -> Option<&Rule> {
+        self.rule_of(at.body)
+            .or_else(|| self.rule(self.components.get(&at.component?)?))
+    }
+
+    /// [`PlasticData::effects`], with each assigned component's rule
+    /// material on its bodies (a body's own assignment wins).
+    pub fn effects_in(&self, doc: &rcad_plugin::DocContext) -> DataEffects {
+        let mut e = self.effects();
+        for (c, n) in &self.components {
+            let Some(m) = self.rule(n).and_then(|r| r.material.clone()) else {
+                continue;
+            };
+            for b in doc.components.get(c).into_iter().flatten() {
+                if !self.bodies.contains_key(b) {
+                    e.materials.push((*b, m.clone()));
+                }
+            }
+        }
+        e
     }
 
     pub fn effects(&self) -> DataEffects {
@@ -226,6 +258,7 @@ mod tests {
         let d = PlasticData {
             rules: vec![Rule::preset("abs").unwrap()],
             bodies: [(1, "ABS".to_string())].into(),
+            ..Default::default()
         };
         d.validate().unwrap();
         let e = d.effects();
@@ -250,6 +283,7 @@ mod tests {
         let mut d = PlasticData {
             rules: vec![Rule::preset("abs").unwrap()],
             bodies: [(1, "PC".to_string())].into(),
+            ..Default::default()
         };
         assert!(d.validate().is_err());
         d.bodies.clear();

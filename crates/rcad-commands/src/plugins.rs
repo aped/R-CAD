@@ -183,7 +183,16 @@ fn rule_symbols(
         .get(plugin)
         .cloned()
         .unwrap_or(serde_json::Value::Null);
-    let sym = p.rule_symbols(&data, body.map(|b| b.0));
+    let component = body
+        .and_then(|b| doc.assembly.component_of(b))
+        .map(|c| c.id.0);
+    let sym = p.rule_symbols_in(
+        &data,
+        &rp::RuleContext {
+            body: body.map(|b| b.0),
+            component,
+        },
+    );
     // Only symbols whose parameters exist (a rule whose effects were
     // applied); otherwise the templates would not evaluate.
     sym.into_iter()
@@ -268,13 +277,25 @@ pub fn create_feature(m: &mut Model, c: &PluginFeatureCmd) -> Result<FeatureId, 
     })
 }
 
+/// Each assembly component's bodies, for plugin data effects.
+pub fn doc_context(doc: &Document) -> rp::DocContext {
+    rp::DocContext {
+        components: doc
+            .assembly
+            .components
+            .iter()
+            .map(|c| (c.id.0, c.bodies.iter().map(|b| b.0).collect()))
+            .collect(),
+    }
+}
+
 pub fn set_data(m: &mut Model, c: &SetPluginDataCmd) -> Result<String, DocError> {
     let p = find(&c.plugin)?;
     let effects = if c.data.is_null() {
         rp::DataEffects::default()
     } else {
         p.validate_data(&c.data).map_err(plugin_err)?;
-        p.data_effects(&c.data)
+        p.data_effects_in(&c.data, &doc_context(m.document()))
     };
     for q in &effects.parameters {
         rcad_document::params::valid_name(&q.name).map_err(|e| DocError::Expression {
