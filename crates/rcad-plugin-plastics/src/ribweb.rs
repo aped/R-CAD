@@ -91,13 +91,12 @@ pub fn web_schema() -> FeatureSchema {
     )
 }
 
+/// A line `(a, b)` and how far to extend it at `a` and at `b`.
+type Ends = ([f64; 2], [f64; 2], f64, f64);
+
 /// The sketch's lines with how far to extend each end (half the thickness
 /// where another line ends at the same point).
-fn lines(
-    f: &str,
-    s: &SketchGeom,
-    t: f64,
-) -> Result<Vec<([f64; 2], [f64; 2], f64, f64)>, PluginError> {
+fn lines(f: &str, s: &SketchGeom, t: f64) -> Result<Vec<Ends>, PluginError> {
     let mut v = Vec::new();
     for c in &s.curves {
         match c {

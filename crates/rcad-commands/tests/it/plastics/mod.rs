@@ -5,6 +5,7 @@ mod boss;
 mod lip;
 mod rest;
 mod ribweb;
+mod rules;
 mod snap;
 
 use rcad_commands::plugins::PluginFeatureCmd;
