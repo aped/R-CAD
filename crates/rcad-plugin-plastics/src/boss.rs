@@ -547,15 +547,9 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
             });
         }
         // Root fillet last: an exact torus band where the shank meets its
-        // face (straight shanks; nothing else may touch the base loop).
+        // face (straight or drafted shanks; nothing else may touch the base loop).
         let rr = p("root_radius")?;
         if rr > 0.0 {
-            if da > 0.0 {
-                return Err(unsupported(
-                    F,
-                    "root fillets need a straight shank (draft_deg 0): the kernel's root fillet takes a cylinder",
-                ));
-            }
             ops.push(Op::RootRound {
                 id: id + 28,
                 body: "sketch".into(),
@@ -563,6 +557,7 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
                 axis: at.z,
                 boss_diameter: d,
                 radius: rr,
+                draft_deg: da.to_degrees(),
                 label: lbl("root fillet"),
             });
         }
@@ -740,12 +735,6 @@ fn mate_ops(
     }
     let rr = p("root_radius")?;
     if rr > 0.0 {
-        if da > 0.0 {
-            return Err(unsupported(
-                F,
-                "root fillets need a straight shank (draft_deg 0)",
-            ));
-        }
         ops.push(Op::RootRound {
             id: id + 29,
             body: "mate".into(),
@@ -753,6 +742,7 @@ fn mate_ops(
             axis: at.z,
             boss_diameter: md,
             radius: rr,
+            draft_deg: da,
             label: lbl("root fillet"),
         });
     }

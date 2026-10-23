@@ -422,6 +422,7 @@ pub(super) fn eval_plugin(
             axis,
             boss_diameter,
             radius,
+            draft_deg,
             label,
             ..
         } = op
@@ -431,16 +432,23 @@ pub(super) fn eval_plugin(
                     DocError::Validation(format!("{id}: {label}: no target body"))
                 })?);
             let t = brep_target(st, id, target)?;
-            let out =
-                k::root_round(&t, *at, *axis, *boss_diameter, *radius).map_err(|e| match e {
-                    k::KernelError::InvalidInput(m) => {
-                        DocError::ProductLimit(format!("{id}: {label}: {m}"))
-                    }
-                    other => DocError::Kernel {
-                        feature: id,
-                        detail: format!("{label}: {other}"),
-                    },
-                })?;
+            let out = k::root_round(
+                &t,
+                *at,
+                *axis,
+                *boss_diameter,
+                *radius,
+                draft_deg.to_radians(),
+            )
+            .map_err(|e| match e {
+                k::KernelError::InvalidInput(m) => {
+                    DocError::ProductLimit(format!("{id}: {label}: {m}"))
+                }
+                other => DocError::Kernel {
+                    feature: id,
+                    detail: format!("{label}: {other}"),
+                },
+            })?;
             replace_body(st, id, target, out);
             continue;
         }

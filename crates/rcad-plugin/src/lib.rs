@@ -257,7 +257,7 @@ pub enum Op {
         label: String,
     },
     /// Exact concave root fillet of radius `radius` where the round boss
-    /// of `boss_diameter` on the axis through `at` along `axis` meets the
+    /// (cylinder or drafted cone) of `boss_diameter` at its base on the axis through `at` along `axis` meets the
     /// planar face through `at` it stands on, on the body of input `body`.
     /// Built into the topology by the kernel (a torus band; no boolean),
     /// checked by probes.
@@ -268,6 +268,10 @@ pub enum Op {
         axis: [f64; 3],
         boss_diameter: f64,
         radius: f64,
+        /// Draft of the boss wall (degrees; 0: a cylinder): it narrows by
+        /// tan(draft) per mm away from the base.
+        #[serde(default)]
+        draft_deg: f64,
         #[serde(default)]
         label: String,
     },
@@ -646,6 +650,7 @@ pub fn check_ops(req: &BuildRequest, ops: &[Op]) -> Result<(), PluginError> {
             boss_diameter,
             radius,
             label,
+            ..
         } = op
         {
             let what = format!(

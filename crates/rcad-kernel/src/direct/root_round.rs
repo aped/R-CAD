@@ -1,5 +1,5 @@
-//! Exact concave root fillet where a round boss meets the face it stands
-//! on, built directly into the topology like [`super::countersink`] (a
+//! Exact concave root fillet where a round boss (cylinder, or a cone
+//! narrowing away from the base by a draft) meets the face it stands on, built directly into the topology like [`super::countersink`] (a
 //! boolean would meet the fillet's tangent contacts with the face and the
 //! boss, which Truck cannot resolve).
 //!
@@ -35,7 +35,13 @@ pub fn root_round(
     axis: [f64; 3],
     boss_diameter: f64,
     radius: f64,
+    half_angle: f64,
 ) -> Result<Body> {
+    if !(half_angle.is_finite() && (0.0..std::f64::consts::FRAC_PI_4).contains(&half_angle)) {
+        return Err(invalid(
+            "root fillet: the wall's draft must be within 0..45 degrees",
+        ));
+    }
     let finite = [boss_diameter, radius]
         .iter()
         .chain(&axis_point)
@@ -58,18 +64,34 @@ pub fn root_round(
     let c0 = Point3::new(axis_point[0], axis_point[1], axis_point[2]);
     let mut sh = shell_of(body)?;
     let tol = geo_tol(&sh);
-    // Boss wall: coaxial convex cylinder faces of radius r.
+    // Boss wall: the non-planar faces on the cone (a cylinder when
+    // `half_angle` is 0) of radius r at the base plane through the axis
+    // point, narrowing by tan(half_angle) per mm along the base's normal;
+    // material inside it.
+    let tan_a = half_angle.tan();
     let mut cyl = BTreeSet::new();
     for (i, face) in sh.faces.iter().enumerate() {
-        if let Some((c, ax, rr, hole)) = cylinder_of(&sh, face, tol)? {
-            let d = c - c0;
-            if !hole
-                && ax.cross(a).magnitude() <= 1e-9
-                && (d - a * d.dot(a)).magnitude() <= tol
-                && (rr - r).abs() <= tol
-            {
-                cyl.insert(i);
-            }
+        if matches!(face.surface, Surface::Plane(_)) {
+            continue;
+        }
+        let Ok(samples) = face_samples(&sh, face) else {
+            continue;
+        };
+        if samples.len() < 3 {
+            continue;
+        }
+        let on = samples.iter().all(|(p, nrm)| {
+            let d = *p - c0;
+            let h = d.dot(a);
+            let radial = d - a * h;
+            let rho = radial.magnitude();
+            // Both axis senses: the base normal is found below; accept a
+            // wall narrowing either way here and check the sense after.
+            let fit = (rho - (r - h * tan_a)).abs() <= tol || (rho - (r + h * tan_a)).abs() <= tol;
+            fit && rho > tol && nrm.dot(radial / rho) > 0.0
+        });
+        if on {
+            cyl.insert(i);
         }
     }
     if cyl.is_empty() {
@@ -110,7 +132,28 @@ pub fn root_round(
     };
     let base_origin = plane_of(&sh.faces[bf]).map_or(c0, |x| x.0);
     let centre = c0 - n * (c0 - base_origin).dot(n);
-    let big = r + f;
+    if half_angle > 0.0 {
+        for &g in &cyl {
+            let ok = face_samples(&sh, &sh.faces[g])?.iter().all(|(p, _)| {
+                let d = *p - centre;
+                let h = d.dot(n);
+                ((d - n * h).magnitude() - (r - h * tan_a)).abs() <= tol
+            });
+            if !ok {
+                return Err(invalid(
+                    "root fillet: the boss wall does not narrow away from the base by the given draft",
+                ));
+            }
+        }
+    }
+    // Fillet circle tangent to the base and to the wall's generator: centre
+    // at height f, radius `cx` from the axis; tangent points W on the wall,
+    // B on the base.
+    let (sa, ca) = half_angle.sin_cos();
+    let cx = r + f * (1.0 - sa) / ca;
+    let h_t = f * (1.0 - sa);
+    let r_t = cx - f * ca;
+    let big = cx;
     // Clearance on the base face.
     {
         let fr = frame_on(base_origin, n);
@@ -169,26 +212,27 @@ pub fn root_round(
         let (fixed, moving) = if on_p { (q, p) } else { (p, q) };
         let (f0, m0) = (sh.vertices[fixed], sh.vertices[moving]);
         let up = (f0 - m0).dot(n);
+        let g = (f0 - m0).normalize();
         let pts = curve_samples(&sh.edges[e].curve, 16)?;
         if pts
             .iter()
-            .any(|x| ((*x - f0) - n * (*x - f0).dot(n)).magnitude() > tol)
-            || ((f0 - m0) - n * up).magnitude() > tol
+            .any(|x| ((*x - m0) - g * (*x - m0).dot(g)).magnitude() > tol)
         {
             return Err(invalid(
-                "root fillet: the boss wall has an edge that is not straight along the axis",
+                "root fillet: the boss wall has an edge that is not a straight generator",
             ));
         }
-        if up - f < tol::MIN_LENGTH {
+        if up - h_t < tol::MIN_LENGTH {
             return Err(invalid(format!(
                 "root fillet R{f} mm reaches the top of the boss wall ({up:.6} mm high)"
             )));
         }
         seams.insert(e);
     }
-    let lift = Matrix4::from_translation(n * f);
+    let lift = Matrix4::from_translation(n * h_t) * radial_scaling(centre, a, r_t / r);
     let scale_out = radial_scaling(centre, a, big / r);
-    let w45 = std::f64::consts::FRAC_1_SQRT_2;
+    // Arc weight: cos of half its sweep (90° − the wall's draft).
+    let w45 = ((std::f64::consts::FRAC_PI_2 - half_angle) / 2.0).cos();
     // New outer vertices on the base; lift the loop vertices. Keep the
     // original positions (the quarter circles' corners).
     let mut out_v = BTreeMap::new();
@@ -198,7 +242,7 @@ pub fn root_round(
         corner.insert(v, p);
         out_v.insert(v, sh.vertices.len());
         sh.vertices.push(scale_out.transform_point(p));
-        sh.vertices[v] = p + n * f;
+        sh.vertices[v] = lift.transform_point(p);
     }
     for &e in &seams {
         let (p, q) = sh.edges[e].vertices;
@@ -236,7 +280,7 @@ pub fn root_round(
     let mut touched: BTreeSet<usize> = seams.clone();
     touched.extend(side.values().copied());
     // Profile in (radius, height, weight): wall end, corner, base end.
-    let profile = [(r, f, 1.0), (r, 0.0, w45), (big, 0.0, 1.0)];
+    let profile = [(r_t, h_t, 1.0), (r, 0.0, w45), (big, 0.0, 1.0)];
     for (k, &(e, o)) in lp.iter().enumerate() {
         let original = sh.edges[e].curve.clone();
         let src = nurbs(&original)?;
@@ -327,8 +371,8 @@ pub fn root_round(
         x - a * x.dot(a)
     }
     .normalize();
-    let material = centre + u * (r + 0.15 * f) + n * (0.15 * f);
-    let air = centre + u * (r + 0.8 * f) + n * (0.8 * f);
+    let material = centre + u * (r + 0.1 * f) + n * (0.05 * f);
+    let air = centre + u * (cx - 0.2 * f) + n * (0.8 * f);
     let m = crate::point_membership(&out, &[p3(material), p3(air)])?;
     if m[0] != Some(true) || m[1] != Some(false) {
         return Err(KernelError::InvalidResult(format!(

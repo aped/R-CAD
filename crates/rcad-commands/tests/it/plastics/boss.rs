@@ -421,3 +421,39 @@ fn ribs_on_a_drafted_shank_are_refused_by_name() {
     );
     assert!(m.contains("drafted shank"), "{m}");
 }
+
+#[test]
+fn a_root_fillet_on_a_drafted_shank_meets_the_cone() {
+    let (mut s, _, sk) = setup();
+    ok(
+        &mut s,
+        feature(
+            "boss",
+            &[("sketch", sketch_in(sk))],
+            &[("height", 8.0), ("draft_deg", 2.0), ("root_radius", 1.0)],
+            &[],
+        ),
+    );
+    // Spandrel between the base, the cone generator (leaning 2° in) and the
+    // tangent arc, revolved: Pappus with the region integrated numerically
+    // in (radius, height) from the closed-form boundary (independent of the
+    // kernel).
+    let a = 2f64.to_radians();
+    let f = 1.0f64;
+    let (sa, ca) = a.sin_cos();
+    let cx = 3.0 + f * (1.0 - sa) / ca;
+    let h_t = f * (1.0 - sa);
+    // At height y in [0, h_t]: from the wall r - y tan a to the arc
+    // cx - sqrt(f² - (f - y)²); integrate (2π ρ dρ) over that interval.
+    let n = 20000;
+    let mut v = 0.0;
+    for i in 0..n {
+        let y = (i as f64 + 0.5) * h_t / n as f64;
+        let wall = 3.0 - y * a.tan();
+        let arc = cx - (f * f - (f - y).powi(2)).sqrt();
+        v += PI * (arc * arc - wall * wall) * h_t / n as f64;
+    }
+    let shank = frustum(3.0, 3.0 - 8.0 * a.tan(), 8.0);
+    let want = PLATE + 2.0 * (shank - PI * 1.25f64.powi(2) * 6.0 + v);
+    assert_close(vol(&s, BodyId(1)), want, 1e-6, "volume");
+}
