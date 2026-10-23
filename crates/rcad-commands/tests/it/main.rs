@@ -32,6 +32,8 @@ mod exchange_qualification;
 mod export_determinism;
 mod expression_and_hole_regressions;
 mod external_component;
+// Unix only: the example plugin's `python3` is not reliably on PATH on Windows.
+#[cfg(unix)]
 mod external_plugin;
 mod extrude_options;
 mod face_ref_of;
