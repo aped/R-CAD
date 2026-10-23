@@ -316,6 +316,139 @@ pub(super) fn eval_plugin(
     }
     let mut tools = Vec::with_capacity(ops.len());
     for op in &ops {
+        if let rp::Op::EdgeFillet {
+            body,
+            a,
+            b,
+            radius,
+            label,
+            ..
+        } = op
+        {
+            let target =
+                BodyId(rp::target_body(&req, body).ok_or_else(|| {
+                    DocError::Validation(format!("{id}: {label}: no target body"))
+                })?);
+            let t = brep_target(st, id, target)?;
+            let plane = |p: &[[f64; 3]; 2]| {
+                rp::Frame::from_normal(p[0], p[1], [1.0, 0.0, 0.0])
+                    .map(|f| from_plugin_frame(&f))
+                    .ok_or_else(|| DocError::Validation(format!("{id}: {label}: degenerate plane")))
+            };
+            let out = k::fillet_edge(&t, &plane(a)?, &plane(b)?, *radius).map_err(|e| match e {
+                k::KernelError::InvalidInput(m) => {
+                    DocError::ProductLimit(format!("{id}: {label}: {m}"))
+                }
+                other => DocError::Kernel {
+                    feature: id,
+                    detail: format!("{label}: {other}"),
+                },
+            })?;
+            replace_body(st, id, target, out);
+            continue;
+        }
+        if let rp::Op::RootRound {
+            body,
+            at,
+            axis,
+            boss_diameter,
+            radius,
+            label,
+            ..
+        } = op
+        {
+            let target =
+                BodyId(rp::target_body(&req, body).ok_or_else(|| {
+                    DocError::Validation(format!("{id}: {label}: no target body"))
+                })?);
+            let t = brep_target(st, id, target)?;
+            let out =
+                k::root_round(&t, *at, *axis, *boss_diameter, *radius).map_err(|e| match e {
+                    k::KernelError::InvalidInput(m) => {
+                        DocError::ProductLimit(format!("{id}: {label}: {m}"))
+                    }
+                    other => DocError::Kernel {
+                        feature: id,
+                        detail: format!("{label}: {other}"),
+                    },
+                })?;
+            replace_body(st, id, target, out);
+            continue;
+        }
+        if let rp::Op::Revolve {
+            body,
+            frame,
+            profile,
+            angle_deg,
+            mode,
+            label,
+            ..
+        } = op
+        {
+            let target =
+                BodyId(rp::target_body(&req, body).ok_or_else(|| {
+                    DocError::Validation(format!("{id}: {label}: no target body"))
+                })?);
+            let t = brep_target(st, id, target)?;
+            let frame = from_plugin_frame(frame);
+            let prof = profile
+                .to_sketch()
+                .map_err(|m| DocError::Validation(format!("{id}: {label}: {m}")))?;
+            let angle = angle_deg.to_radians();
+            let tool =
+                k::revolve(&to_kernel(&prof), &frame, angle).map_err(|e| DocError::Kernel {
+                    feature: id,
+                    detail: format!("{label}: revolve: {e}"),
+                })?;
+            let op = match mode {
+                rp::Mode::Join => k::CombineOp::Join,
+                rp::Mode::Cut => k::CombineOp::Cut,
+            };
+            // As for revolved Join/Cut features: a full turn is the same
+            // solid whatever its seam, so retry with the seam turned.
+            let full = angle >= 2.0 * std::f64::consts::PI - 1e-12;
+            let turns: &[f64] = if full {
+                &[0.0, 0.37, 1.13, 2.71]
+            } else {
+                &[0.0]
+            };
+            let mut last = None;
+            let mut done = None;
+            for &a in turns {
+                let tl = if a == 0.0 {
+                    tool.clone()
+                } else {
+                    let rot =
+                        k::Rigid::new([0.0; 3], frame.origin, frame.y, a).map_err(kernel(id))?;
+                    k::transform_body(&tool, &rot).map_err(kernel(id))?
+                };
+                match k::combine(&t, std::slice::from_ref(&tl), op) {
+                    Ok(x) => {
+                        done = Some(x);
+                        break;
+                    }
+                    Err(e) => last = Some(e),
+                }
+            }
+            let (out, rep) = done.ok_or_else(|| DocError::Kernel {
+                feature: id,
+                detail: format!(
+                    "{label}: {}",
+                    last.map(|e| e.to_string()).unwrap_or_default()
+                ),
+            })?;
+            if !rep.passed() {
+                return Err(DocError::GeometryCheck {
+                    feature: id,
+                    detail: format!("{label}: {}; refused", rep.failure().unwrap_or_default()),
+                });
+            }
+            replace_body(st, id, target, out);
+            if r.body.is_none() {
+                r.body = Some(target);
+            }
+            continue;
+        }
         if let rp::Op::Countersink {
             body,
             at,

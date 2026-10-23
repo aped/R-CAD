@@ -27,12 +27,14 @@
 //! * parts 24/25: with `step` out/in, an alignment ring of `step_diameter` ×
 //!   `step_depth` on the shank top (or a recess `gap` wider and deeper), and
 //!   the opposite on the mating boss;
+//! * parts 28/29: with `root_radius`, an exact concave fillet (torus band)
+//!   where the straight shank (and the mating shank) meets its face, last;
 //! * part 30: with `tip_radius`, a fillet of the shank top's outer edge
 //!   (exact cap-loop blend; refused by the kernel where gussets reach the
 //!   top or the hole is within the radius of the edge).
 //!
 //! Not supported (refused or absent, stated): ribs on a drafted shank
-//! (cone/plane joins), root fillets, drafted ribs, countersinks, a fastener component.
+//! (cone/plane joins), drafted ribs, countersinks, a fastener component.
 use crate::util::{EPS, SINK, invalid, placement_points, prism, standing, unsupported};
 use crate::{choice, input, param};
 use rcad_plugin::geom::{back_below_over, dot, footprint_of, next_below_over};
@@ -212,6 +214,15 @@ pub fn schema() -> FeatureSchema {
                 Some((0.0, true)),
                 Some(179.0),
                 None,
+            ),
+            param(
+                "root_radius",
+                "Root fillet radius (0: none)",
+                Length,
+                0.0,
+                nonneg,
+                None,
+                Some("NR"),
             ),
             param(
                 "tip_radius",
@@ -512,6 +523,26 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
                 label: lbl("tip fillet"),
             });
         }
+        // Root fillet last: an exact torus band where the shank meets its
+        // face (straight shanks; nothing else may touch the base loop).
+        let rr = p("root_radius")?;
+        if rr > 0.0 {
+            if da > 0.0 {
+                return Err(unsupported(
+                    F,
+                    "root fillets need a straight shank (draft_deg 0): the kernel's root fillet takes a cylinder",
+                ));
+            }
+            ops.push(Op::RootRound {
+                id: id + 28,
+                body: "sketch".into(),
+                at: at.origin,
+                axis: at.z,
+                boss_diameter: d,
+                radius: rr,
+                label: lbl("root fillet"),
+            });
+        }
         if let Some(m) = mate {
             mate_ops(req, &mut ops, id, s.frame.point(*pt, top), &s.frame, m, i)?;
         }
@@ -683,6 +714,24 @@ fn mate_ops(
             Mode::Cut,
             lbl("counterbore"),
         ));
+    }
+    let rr = p("root_radius")?;
+    if rr > 0.0 {
+        if da > 0.0 {
+            return Err(unsupported(
+                F,
+                "root fillets need a straight shank (draft_deg 0)",
+            ));
+        }
+        ops.push(Op::RootRound {
+            id: id + 29,
+            body: "mate".into(),
+            at: at.origin,
+            axis: at.z,
+            boss_diameter: md,
+            radius: rr,
+            label: lbl("root fillet"),
+        });
     }
     Ok(())
 }

@@ -406,7 +406,10 @@ fn example_vent_slots_plugin_handles_depth_single_slots_and_refusals() {
                 Op::Prism { id, .. }
                 | Op::EdgeLoop { id, .. }
                 | Op::ReplaceFace { id, .. }
-                | Op::Countersink { id, .. } => *id,
+                | Op::Countersink { id, .. }
+                | Op::Revolve { id, .. }
+                | Op::RootRound { id, .. }
+                | Op::EdgeFillet { id, .. } => *id,
             })
             .collect()
     };

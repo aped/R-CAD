@@ -227,3 +227,22 @@ fn outward_hooks_point_away_from_their_centroid() {
     );
     assert_eq!(pr, [Some(true), Some(false), Some(true), Some(false)]);
 }
+
+#[test]
+fn a_base_fillet_rounds_both_sides_of_the_hook_root() {
+    let (mut s, e) = setup();
+    let sk = points_sketch(&mut s, end_cap(e), &[[0.0, 0.0]]);
+    let mut p = HOOK.to_vec();
+    p.push(("base_fillet", 0.5));
+    ok(
+        &mut s,
+        feature("snap_fit", &[("sketch", sketch_in(sk))], &p, &[]),
+    );
+    let spandrel = 0.25 * (1.0 - std::f64::consts::PI / 4.0);
+    assert_close(
+        vol(&s, BodyId(1)),
+        PLATE + 5.0 * hook_area(8.0) + 2.0 * 5.0 * spandrel,
+        1e-6,
+        "volume",
+    );
+}

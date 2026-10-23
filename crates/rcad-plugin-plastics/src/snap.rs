@@ -26,7 +26,7 @@
 //! either).
 use crate::util::{EPS, SINK, invalid, placement_points, prism, standing};
 use crate::{choice, input, param};
-use rcad_plugin::geom::{footprint_of, next_below_over};
+use rcad_plugin::geom::{footprint_of, next_below_over, scale};
 use rcad_plugin::schema::FeatureSchema;
 use rcad_plugin::{BuildRequest, InputKind, Mode, Op, ParamKind, PluginError, Profile};
 
@@ -139,6 +139,15 @@ pub fn schema() -> FeatureSchema {
                 Length,
                 3.0,
                 pos,
+                None,
+                None,
+            ),
+            param(
+                "base_fillet",
+                "Base fillet radius (0: none)",
+                Length,
+                0.0,
+                Some((0.0, false)),
                 None,
                 None,
             ),
@@ -310,6 +319,40 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
             Mode::Join,
             lbl("hook"),
         ));
+        // Base fillets: both sides of the beam where it meets its face
+        // (exact edge fillets; the outer side follows the beam's taper).
+        let bf = p("base_fillet")?;
+        if bf > 0.0 {
+            let (a, c, l, ch) = (
+                p("thickness")?,
+                p("tip_thickness")?,
+                p("length")?,
+                p("catch_height")?,
+            );
+            let v0 = l - ch;
+            let x0 = a + (c - a) * v0 / l;
+            let (nx, ny) = (v0, -(x0 - a));
+            let nn = nx.hypot(ny);
+            let outer = rcad_plugin::geom::add(scale(f.x, nx / nn), scale(f.y, ny / nn));
+            let face_y = y0 + SINK;
+            let base = (f.point([0.0, face_y], 0.0), f.y);
+            for (k, (pt, n)) in [
+                (f.point([0.0, face_y], 0.0), scale(f.x, -1.0)),
+                (f.point([a, 0.0], 0.0), outer),
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                ops.push(Op::EdgeFillet {
+                    id: id + 4 + k as u32,
+                    body: "sketch".into(),
+                    a: [pt, n],
+                    b: [base.0, base.1],
+                    radius: bf,
+                    label: lbl(&format!("base fillet {}", k + 1)),
+                });
+            }
+        }
         if !mate {
             continue;
         }

@@ -43,7 +43,7 @@ pub use combine::{
 pub use direct::{
     CylinderFeature, DirectEdit, DirectFace, classify_face, classify_faces, countersink,
     cylinder_feature, offset_face, planar_face_area, remove_cylinder, renumber, replace_face,
-    resize_cylinder, tilt_offset_frame,
+    resize_cylinder, root_round, tilt_offset_frame,
 };
 pub use edges::{
     DrawingEdge, EDGE_FIT_TOL, EdgeCurve, POLY_SAMPLES, SMOOTH_COS, drawing_edges, sharp_edges,

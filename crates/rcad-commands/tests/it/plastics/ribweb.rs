@@ -329,3 +329,77 @@ fn ribs_to_next_need_one_distance_along_the_curve() {
     );
     assert!(m.contains("one depth"), "{m}");
 }
+
+#[test]
+fn root_fillets_round_where_webs_and_ribs_meet_the_floor() {
+    use std::f64::consts::PI;
+    let spandrel = |f: f64| f * f * (1.0 - PI / 4.0);
+    // Web across the cavity in y (36 between the walls), 2 thick, to the floor.
+    let (mut s, e) = open_box();
+    let sk = line_sketch(&mut s, end_cap(e), &[([0.0, -19.0], [0.0, 19.0])]);
+    ok(
+        &mut s,
+        feature(
+            "web",
+            &[("sketch", sketch_in(sk))],
+            &[
+                ("thickness", 2.0),
+                ("draft_deg", 0.0),
+                ("fillet_radius", 1.0),
+            ],
+            &[("direction", "flip"), ("extent", "to_next")],
+        ),
+    );
+    assert_close(
+        vol(&s, BodyId(1)),
+        BOX + 36.0 * 2.0 * 18.0 + 2.0 * 36.0 * spandrel(1.0),
+        1e-6,
+        "filleted web",
+    );
+    // In the fillet corner beside the web: material; beyond the arc: air.
+    let pr = probe(&s, BodyId(1), &[[1.1, 0.0, 2.1], [1.9, 0.0, 2.9]]);
+    assert_eq!(pr, [Some(true), Some(false)]);
+    // Rib (XZ plane at z 15, 56 across), to the floor, with fillets.
+    let (mut s, _) = open_box();
+    let sk = line_sketch(
+        &mut s,
+        SketchPlane::WorldXZ,
+        &[([-28.0, 15.0], [28.0, 15.0])],
+    );
+    ok(
+        &mut s,
+        feature(
+            "rib",
+            &[("sketch", sketch_in(sk)), ("body", body_in())],
+            &[
+                ("thickness", 2.0),
+                ("draft_deg", 0.0),
+                ("fillet_radius", 1.0),
+            ],
+            &[("side", "right"), ("extent", "to_next")],
+        ),
+    );
+    assert_close(
+        vol(&s, BodyId(1)),
+        BOX + 56.0 * 2.0 * 13.0 + 2.0 * 56.0 * spandrel(1.0),
+        1e-6,
+        "filleted rib",
+    );
+    // Without to next, the face is unknown: refused.
+    let (mut s, _) = open_box();
+    let sk = line_sketch(
+        &mut s,
+        SketchPlane::WorldXZ,
+        &[([-28.0, 15.0], [28.0, 15.0])],
+    );
+    let m = err(
+        &mut s,
+        feature(
+            "rib",
+            &[("sketch", sketch_in(sk)), ("body", body_in())],
+            &[("depth", 13.5), ("draft_deg", 0.0), ("fillet_radius", 1.0)],
+            &[("side", "right")],
+        ),
+    );
+    assert!(m.contains("need extent to_next"), "{m}");
+}

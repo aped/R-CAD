@@ -206,6 +206,51 @@ pub enum Op {
     /// replacement (docs/adr/0010: the face is a convex single loop of
     /// straight edges, its neighbours planes, one side edge per vertex; the
     /// result is checked by probes). Used for drafts of existing faces.
+    /// The region `profile` (plane coordinates of `frame`, all at `x >= 0`)
+    /// revolved `angle_deg` about `frame.y` through `frame.origin`, joined to
+    /// or cut from the body of input `body` through the kernel's checked
+    /// combine (the exact revolved booleans of the shapeops fork, with an
+    /// independent membership check). For rings such as root fillets.
+    Revolve {
+        id: u32,
+        body: String,
+        frame: Frame,
+        profile: Profile,
+        #[serde(default = "full_turn")]
+        angle_deg: f64,
+        mode: Mode,
+        #[serde(default)]
+        label: String,
+    },
+    /// Exact fillet of radius `radius` of the straight edge where the faces
+    /// in planes `a` and `b` (a point and the outward unit normal each) meet,
+    /// on the body of input `body`: the kernel's edge fillet (convex or
+    /// concave, the body prismatic along the edge; docs/FILLETS.md). Used for
+    /// root fillets of ribs, webs and hooks.
+    EdgeFillet {
+        id: u32,
+        body: String,
+        a: [[f64; 3]; 2],
+        b: [[f64; 3]; 2],
+        radius: f64,
+        #[serde(default)]
+        label: String,
+    },
+    /// Exact concave root fillet of radius `radius` where the round boss
+    /// of `boss_diameter` on the axis through `at` along `axis` meets the
+    /// planar face through `at` it stands on, on the body of input `body`.
+    /// Built into the topology by the kernel (a torus band; no boolean),
+    /// checked by probes.
+    RootRound {
+        id: u32,
+        body: String,
+        at: [f64; 3],
+        axis: [f64; 3],
+        boss_diameter: f64,
+        radius: f64,
+        #[serde(default)]
+        label: String,
+    },
     /// Exact countersink (cone of `diameter` at the entry, included angle
     /// `angle_deg`) of the round hole of `hole_diameter` on the axis through
     /// `at` along `axis`, entering from the planar face through `at`
@@ -236,6 +281,10 @@ pub enum Op {
 
 fn yes() -> bool {
     true
+}
+
+fn full_turn() -> f64 {
+    360.0
 }
 
 /// Edge blend of an [`Op::EdgeLoop`].
@@ -484,6 +533,115 @@ pub fn check_ops(req: &BuildRequest, ops: &[Op]) -> Result<(), PluginError> {
     let mut ids = std::collections::BTreeSet::new();
     let mut prisms = std::collections::BTreeSet::new();
     for op in ops {
+        if let Op::EdgeFillet {
+            id,
+            body,
+            a,
+            b,
+            radius,
+            label,
+        } = op
+        {
+            let what = format!(
+                "{}: {}",
+                req.feature,
+                if label.is_empty() {
+                    "edge fillet"
+                } else {
+                    label
+                }
+            );
+            let bad = |m: &str| Err(PluginError::Failed(format!("{what}: {m}")));
+            if !ids.insert(*id) {
+                return bad("operation id repeated");
+            }
+            if target_body(req, body).is_none() {
+                return bad(&format!(
+                    "'{body}' is not a face, body or sketch-on-face input"
+                ));
+            }
+            let ok = a.iter().chain(b).flatten().all(|v| v.is_finite())
+                && (geom::norm(a[1]) - 1.0).abs() < 1e-9
+                && (geom::norm(b[1]) - 1.0).abs() < 1e-9
+                && geom::norm(geom::cross(a[1], b[1])) > 1e-9
+                && *radius > 0.0;
+            if !ok {
+                return bad(
+                    "needs two finite, non-parallel planes with unit normals and a radius > 0",
+                );
+            }
+            continue;
+        }
+        if let Op::RootRound {
+            id,
+            body,
+            at,
+            axis,
+            boss_diameter,
+            radius,
+            label,
+        } = op
+        {
+            let what = format!(
+                "{}: {}",
+                req.feature,
+                if label.is_empty() {
+                    "root fillet"
+                } else {
+                    label
+                }
+            );
+            let bad = |m: &str| Err(PluginError::Failed(format!("{what}: {m}")));
+            if !ids.insert(*id) {
+                return bad("operation id repeated");
+            }
+            if target_body(req, body).is_none() {
+                return bad(&format!(
+                    "'{body}' is not a face, body or sketch-on-face input"
+                ));
+            }
+            if !at.iter().chain(axis).all(|v| v.is_finite())
+                || geom::norm(*axis) < 1e-12
+                || !(*boss_diameter > 0.0 && *radius > 0.0)
+            {
+                return bad("needs a finite axis and positive diameter and radius");
+            }
+            continue;
+        }
+        if let Op::Revolve {
+            id,
+            body,
+            frame,
+            profile,
+            angle_deg,
+            label,
+            ..
+        } = op
+        {
+            let what = format!(
+                "{}: {}",
+                req.feature,
+                if label.is_empty() { "revolve" } else { label }
+            );
+            let bad = |m: &str| Err(PluginError::Failed(format!("{what}: {m}")));
+            if !ids.insert(*id) {
+                return bad("operation id repeated");
+            }
+            if target_body(req, body).is_none() {
+                return bad(&format!(
+                    "'{body}' is not a face, body or sketch-on-face input"
+                ));
+            }
+            if !frame.is_finite()
+                || !(angle_deg.is_finite() && *angle_deg > 0.0 && *angle_deg <= 360.0)
+            {
+                return bad("needs a finite frame and an angle in (0, 360]");
+            }
+            if let Err(m) = profile.to_sketch() {
+                return bad(&m);
+            }
+            continue;
+        }
         if let Op::Countersink {
             id,
             body,

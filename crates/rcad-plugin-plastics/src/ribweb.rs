@@ -68,9 +68,48 @@ fn common(
                 Some(30.0),
                 Some("DA"),
             ),
+            param(
+                "fillet_radius",
+                "Root fillet radius (0: none)",
+                ParamKind::Length,
+                0.0,
+                Some((0.0, false)),
+                None,
+                None,
+            ),
         ],
         choices,
     }
+}
+
+/// The two root fillets of a straight wall standing on a plane: for each
+/// side `(point on the side face, outward normal)` an exact edge fillet
+/// with the base plane `(point, outward normal)`. Operation ids
+/// `1000 + 2·line` and `+1`.
+fn root_fillets(
+    ops: &mut Vec<Op>,
+    line: u32,
+    body: &'static str,
+    sides: [([f64; 3], [f64; 3]); 2],
+    base: ([f64; 3], [f64; 3]),
+    radius: f64,
+    what: &str,
+) {
+    for (k, (p, n)) in sides.into_iter().enumerate() {
+        ops.push(Op::EdgeFillet {
+            id: 1000 + 2 * line + k as u32,
+            body: body.into(),
+            a: [p, n],
+            b: [base.0, base.1],
+            radius,
+            label: format!("{what} root fillet {}", k + 1),
+        });
+    }
+}
+
+/// Unit vector `cos·u + sin·v`.
+fn tilt(u: [f64; 3], v: [f64; 3], a: f64) -> [f64; 3] {
+    add(scale(u, a.cos()), scale(v, a.sin()))
 }
 
 pub fn rib_schema() -> FeatureSchema {
@@ -326,6 +365,7 @@ pub fn build_rib(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
     let sym = req.choice("thickness_side")? == "symmetric";
     let left = req.choice("side")? == "left";
     let to_next = req.choice("extent")? == "to_next";
+    let fr = req.param("fillet_radius")?;
     let faces: &[rcad_plugin::PlanarFace] = if req.has("body") {
         &req.body("body")?.faces
     } else {
@@ -337,6 +377,7 @@ pub fn build_rib(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
         let i = id as usize;
         let l = line(f, pa, pb, ea, eb)?;
         let label = format!("rib line {}", i + 1);
+        let label2 = label.clone();
         let depth = if to_next {
             // Rays from points along the line in the growth direction to the
             // nearest planar face facing them; the farthest hit, so the rib
@@ -413,9 +454,50 @@ pub fn build_rib(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
                 label,
             ));
         }
+        if fr > 0.0 {
+            if !to_next {
+                return Err(invalid(
+                    f,
+                    "root fillets need extent to_next (the face the rib stands on)",
+                ));
+            }
+            // Growth direction, base plane at the face (depth − sink).
+            let dir = if left {
+                l.left(&s.frame)
+            } else {
+                scale(l.left(&s.frame), -1.0)
+            };
+            let reach = depth - SINK;
+            let base_p = add(s.frame.point(l.at(0.0, 0.0), 0.0), scale(dir, reach));
+            let (lo, hi) = if sym { (-t / 2.0, t / 2.0) } else { (0.0, t) };
+            let z = s.frame.z;
+            let p0 = s.frame.point(l.at(0.0, 0.0), 0.0);
+            // Side faces across the sketch normal; drafted: leaning in
+            // with the growth direction.
+            let top = (add(p0, scale(z, hi)), tilt(z, dir, a));
+            let bottom = (
+                add(p0, scale(z, lo)),
+                tilt(scale(z, -1.0), dir, if sym { a } else { 0.0 }),
+            );
+            root_fillets(
+                &mut ops,
+                id,
+                body,
+                [top, bottom],
+                (base_p, scale(dir, -1.0)),
+                fr,
+                &label2,
+            );
+        }
     }
     for (id, arc) in arcs {
         let label = format!("rib arc {}", id + 1);
+        if fr > 0.0 {
+            return Err(unsupported(
+                f,
+                "root fillets along arcs are not supported (straight lines only)",
+            ));
+        }
         if a != 0.0 {
             return Err(unsupported(
                 f,
@@ -489,12 +571,14 @@ pub fn build_web(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
     let sym = req.choice("thickness_side")? == "symmetric";
     let up = req.choice("direction")? == "normal";
     let to_next = req.choice("extent")? == "to_next";
+    let fr = req.param("fillet_radius")?;
     let mut ops = Vec::new();
     let (lines, arcs) = curves(f, s, t)?;
     for (id, (pa, pb, ea, eb)) in lines {
         let i = id as usize;
         let l = line(f, pa, pb, ea, eb)?;
         let label = format!("web line {}", i + 1);
+        let label2 = label.clone();
         let (w0, w1) = if sym { (-t / 2.0, t / 2.0) } else { (0.0, t) };
         let depth = if to_next {
             // The nearest face facing the sketch plane under this line,
@@ -548,9 +632,49 @@ pub fn build_web(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
                 label,
             ));
         }
+        if fr > 0.0 {
+            if !to_next {
+                return Err(invalid(
+                    f,
+                    "root fillets need extent to_next (the face the web stands on)",
+                ));
+            }
+            let n = if up {
+                s.frame.z
+            } else {
+                scale(s.frame.z, -1.0)
+            };
+            let reach = depth - SINK;
+            let p0 = s.frame.point(l.at(0.0, 0.0), 0.0);
+            let base_p = add(p0, scale(n, reach));
+            let left_dir = l.left(&s.frame);
+            let (lo, hi) = if sym { (-t / 2.0, t / 2.0) } else { (0.0, t) };
+            // Side faces across the line; drafted: leaning in away from the
+            // sketch plane.
+            let hi_side = (add(p0, scale(left_dir, hi)), tilt(left_dir, n, a));
+            let lo_side = (
+                add(p0, scale(left_dir, lo)),
+                tilt(scale(left_dir, -1.0), n, if sym { a } else { 0.0 }),
+            );
+            root_fillets(
+                &mut ops,
+                id,
+                body,
+                [hi_side, lo_side],
+                (base_p, scale(n, -1.0)),
+                fr,
+                &label2,
+            );
+        }
     }
     for (id, arc) in arcs {
         let label = format!("web arc {}", id + 1);
+        if fr > 0.0 {
+            return Err(unsupported(
+                f,
+                "root fillets along arcs are not supported (straight lines only)",
+            ));
+        }
         if a != 0.0 {
             return Err(unsupported(
                 f,

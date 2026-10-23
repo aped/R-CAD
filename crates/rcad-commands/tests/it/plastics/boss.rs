@@ -393,3 +393,31 @@ fn a_countersunk_seat_is_an_exact_cone() {
     let pr = probe(&s, BodyId(2), &[p(2.5, 16.9), p(2.5, 16.0)]);
     assert_eq!(pr, [Some(false), Some(true)]);
 }
+
+#[test]
+fn a_root_fillet_ring_follows_pappus() {
+    let (mut s, _, sk) = setup();
+    ok(
+        &mut s,
+        feature(
+            "boss",
+            &[("sketch", sketch_in(sk))],
+            &[("height", 8.0), ("draft_deg", 0.0), ("root_radius", 1.0)],
+            &[],
+        ),
+    );
+    // Spandrel f²(1 − π/4) at its centroid r = R + f(10 − 3π)/(12 − 3π).
+    let f = 1.0f64;
+    let area = f * f * (1.0 - PI / 4.0);
+    let rc = 3.0 + f * (10.0 - 3.0 * PI) / (12.0 - 3.0 * PI);
+    let ring = 2.0 * PI * rc * area;
+    let want = PLATE + 2.0 * (PI * 9.0 * 8.0 - PI * 1.25f64.powi(2) * 6.0 + ring);
+    assert_close(vol(&s, BodyId(1)), want, 1e-6, "volume");
+    // Material in the fillet corner, air beyond the arc.
+    let pr = probe(
+        &s,
+        BodyId(1),
+        &[[-15.0 + 3.1, 0.0, 4.1], [-15.0 + 3.9, 0.0, 4.9]],
+    );
+    assert_eq!(pr, [Some(true), Some(false)]);
+}
