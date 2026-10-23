@@ -1288,10 +1288,10 @@ class BossFeatureSideInput(Base):
         "alignmentDiameter": ("step_diameter", LENGTH),
         "alignmentDepth": ("step_depth", LENGTH),
         "tipRadius": ("tip_radius", LENGTH),
+        "rootRadius": ("root_radius", LENGTH),
     }
     _ENUMS = ("holeExtentType", "ribType", "alignmentType")
     _ZERO_ONLY = {
-        "rootRadius": LENGTH,
         "holeStartRadius": LENGTH,
         "holeEndRadius": LENGTH,
         "ribRootRadius": LENGTH,

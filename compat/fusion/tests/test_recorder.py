@@ -251,8 +251,8 @@ class Features(unittest.TestCase):
             side.setCounterbore(V.createByReal(1), V.createByReal(1), V.createByReal(1), V.createByReal(1))
         with self.assertRaisesRegex(adsk.NotSupported, "BossFeatureSideInput.alignmentDraftAngle"):
             side.alignmentDraftAngle = V.createByReal(0.1)
-        with self.assertRaisesRegex(adsk.NotSupported, "BossFeatureSideInput.rootRadius"):
-            side.rootRadius = V.createByReal(0.1)
+        with self.assertRaisesRegex(adsk.NotSupported, "BossFeatureSideInput.ribRootRadius"):
+            side.ribRootRadius = V.createByReal(0.1)
         with self.assertRaisesRegex(adsk.NotSupported, "BossFeatureInput.side2"):
             bi.side2 = bi.createSideInput()
 
@@ -269,6 +269,7 @@ class Features(unittest.TestCase):
         side.alignmentDiameter = V.createByReal(0.45)
         side.alignmentDepth = V.createByString("1 mm")
         side.tipRadius = V.createByReal(0.05)
+        side.rootRadius = V.createByString("1 mm")
         bi.side1 = side
         bi.offset = V.createByReal(1.0)
         root.features.bossFeatures.add(bi)
@@ -277,6 +278,7 @@ class Features(unittest.TestCase):
         self.assertAlmostEqual(c["params"]["step_diameter"], 4.5, places=12)
         self.assertAlmostEqual(c["params"]["step_depth"], 1.0, places=12)
         self.assertAlmostEqual(c["params"]["tip_radius"], 0.5, places=12)
+        self.assertAlmostEqual(c["params"]["root_radius"], 1.0, places=12)
 
     def test_rib_and_web(self):
         design, root = fresh()

@@ -126,8 +126,9 @@ exist on every object; collections have `count`, `item(i)` and iteration.
 | `.holeExtentType` | `BossHoleThrough` → hole `through`; `BossBlindDepth` → pilot of `holeDepth`; `BossBlindFull` (or no type and no depth) → pilot the full boss height |
 | `.ribCount`, `.ribLength`, `.ribThickness`, `.ribRotation`, `.ribTotalAngle`, `.ribOffset`, `.ribType` | `rib_count`, `rib_length` (from the axis), `rib_thickness`, `rib_angle_deg`, `rib_total_deg`, `rib_height` = boss height − `ribOffset`; `ribType` `BossRibShapeChamfer` (R-CAD's gusset profile) or `BossRibShapeNone` |
 | `.tipRadius` | `tip_radius` (fillet of the shank top) |
+| `.rootRadius` | `root_radius` (exact concave root fillet; 0 when not set) |
 | `.alignmentType` (`BossAlignFlat`, `BossAlignStepOut`, `BossAlignStepIn`), `.alignmentDiameter`, `.alignmentDepth` | `step` (none/out/in), `step_diameter`, `step_depth` |
-| `.rootRadius`, `.holeStartRadius`, `.holeEndRadius`, `.ribRootRadius`, `.ribTipRadius`, `.ribDraftAngle`, `.ribOuterDraftAngle` | accepted only as 0 (not modelled). Every boss is recorded with `root_radius` 0, so the rule's `NR` does not add a root fillet |
+| `.holeStartRadius`, `.holeEndRadius`, `.ribRootRadius`, `.ribTipRadius`, `.ribDraftAngle`, `.ribOuterDraftAngle` | accepted only as 0 (not modelled). Every boss is recorded with `root_radius` 0, so the rule's `NR` does not add a root fillet |
 | `ribFeatures.createInput(curves, thickness, targetBody)`, `RibFeatureInput.setDistanceExtent(depth)`, `.setToNextExtent()`, `.thickness`, `.draftAngle`, `.isFlipped`, `.isSymmetric`, `.targetBody`; `ribFeatures.add` | `plugin_feature` `rib`: `thickness`, `depth`, `draft_deg`; side `right` (the curve direction × the sketch normal) or `left` when flipped; `thickness_side` `symmetric` / `one_side`; `extent` `distance` / `to_next` |
 | `webFeatures.createInput(curves, thickness, targetBody)`, `WebFeatureInput.setDistanceExtent(depth)`, `.setToNextExtent()`, `.thickness`, `.draftAngle`, `.isFlipped`, `.isSymmetric`, `.targetBody`; `webFeatures.add` | `plugin_feature` `web`: as the rib, with `direction` `normal` / `flip` and `extent` `distance` / `to_next` |
 
