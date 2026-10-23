@@ -308,3 +308,58 @@ fn a_tip_fillet_rounds_the_shank_top_exactly() {
     );
     assert_eq!(pr, [Some(false), Some(true)]);
 }
+
+#[test]
+fn alignment_steps_mate_out_with_in() {
+    for step in ["out", "in"] {
+        let (mut s, _, sk) = setup();
+        let lid = plate(&mut s, offset_xy(14.0), 60.0, 40.0, 3.0);
+        let mate = SketchPlane::Face(start_cap(lid));
+        ok(
+            &mut s,
+            feature(
+                "boss",
+                &[("sketch", sketch_in(sk)), ("mate", face_in(mate))],
+                &[
+                    ("height", 8.0),
+                    ("draft_deg", 0.0),
+                    ("gap", 0.5),
+                    ("cbore_depth", 1.0),
+                    ("step_diameter", 4.5),
+                    ("step_depth", 0.5),
+                ],
+                &[("step", step)],
+            ),
+        );
+        let rh: f64 = 1.7;
+        let base = PLATE + 2.0 * (PI * 9.0 * 8.0 - PI * 1.25f64.powi(2) * 6.0);
+        let lid_v = 60.0 * 40.0 * 3.0
+            + 2.0 * (PI * 9.0 * 1.5 - PI * rh * rh * 4.5 - PI * (9.0 - rh * rh) * 1.0);
+        let ring = |r0: f64, r1: f64, h: f64| PI * (r1 * r1 - r0 * r0) * h;
+        let (want_base, want_lid) = if step == "out" {
+            // Ring 2.25 x 0.5 on each boss (pilot through it); the lid's
+            // recess is 0.5 wider in radius and 0.5 deeper.
+            (
+                base + 2.0 * ring(1.25, 2.25, 0.5),
+                lid_v - 2.0 * ring(rh, 2.75, 1.0),
+            )
+        } else {
+            (
+                base - 2.0 * ring(1.25, 2.75, 1.0),
+                lid_v + 2.0 * ring(rh, 2.25, 0.5),
+            )
+        };
+        assert_close(
+            vol(&s, BodyId(1)),
+            want_base,
+            1e-6,
+            &format!("base, step {step}"),
+        );
+        assert_close(
+            vol(&s, BodyId(2)),
+            want_lid,
+            1e-6,
+            &format!("lid, step {step}"),
+        );
+    }
+}

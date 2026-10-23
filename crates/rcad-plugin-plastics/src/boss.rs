@@ -24,12 +24,15 @@
 //!   of `mate_hole_diameter` through the mate body and a counterbore of
 //!   `cbore_diameter` × `cbore_depth` from its outside face.
 //!
+//! * parts 24/25: with `step` out/in, an alignment ring of `step_diameter` ×
+//!   `step_depth` on the shank top (or a recess `gap` wider and deeper), and
+//!   the opposite on the mating boss;
 //! * part 30: with `tip_radius`, a fillet of the shank top's outer edge
 //!   (exact cap-loop blend; refused by the kernel where gussets reach the
 //!   top or the hole is within the radius of the edge).
 //!
 //! Not supported (refused or absent, stated): ribs on a drafted shank
-//! (cone/plane joins), root fillets, drafted ribs, countersinks, alignment steps, a fastener component.
+//! (cone/plane joins), root fillets, drafted ribs, countersinks, a fastener component.
 use crate::util::{EPS, SINK, invalid, placement_points, prism, standing, unsupported};
 use crate::{choice, input, param};
 use rcad_plugin::geom::{back_below_over, dot, footprint_of, next_below_over};
@@ -184,6 +187,24 @@ pub fn schema() -> FeatureSchema {
                 Some("CL"),
             ),
             param(
+                "step_diameter",
+                "Alignment step diameter",
+                Length,
+                4.5,
+                pos,
+                None,
+                None,
+            ),
+            param(
+                "step_depth",
+                "Alignment step height",
+                Length,
+                1.0,
+                pos,
+                None,
+                None,
+            ),
+            param(
                 "tip_radius",
                 "Tip fillet radius (0: none)",
                 Length,
@@ -193,7 +214,10 @@ pub fn schema() -> FeatureSchema {
                 None,
             ),
         ],
-        choices: vec![choice("hole", "Hole", &["pilot", "through", "none"])],
+        choices: vec![
+            choice("hole", "Hole", &["pilot", "through", "none"]),
+            choice("step", "Alignment step (side 1)", &["none", "out", "in"]),
+        ],
     }
 }
 
@@ -365,6 +389,49 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
                 ));
             }
         }
+        // Alignment step: side 1 steps out (a ring on the top) or in (a
+        // recess `gap` wider and deeper); the mating boss gets the opposite.
+        let step = req.choice("step")?;
+        let (sdia, sd, gap) = (p("step_diameter")?, p("step_depth")?, p("gap")?);
+        if step != "none" {
+            if sdia >= top_d - EPS || (hole != "none" && sdia <= hd + EPS) {
+                return Err(invalid(
+                    F,
+                    "the alignment step must lie between the hole and the shank top",
+                ));
+            }
+            let top_frame = at.offset(h);
+            if step == "out" {
+                ops.push(prism(
+                    id + 24,
+                    "sketch",
+                    top_frame,
+                    circle(sdia / 2.0),
+                    vec![],
+                    (0.0, sd),
+                    0.0,
+                    Mode::Join,
+                    lbl("alignment step"),
+                ));
+            } else {
+                let r = sdia / 2.0 + gap;
+                if r >= top_d / 2.0 - EPS || sd + gap >= h - EPS {
+                    return Err(invalid(F, "the alignment recess does not fit the shank"));
+                }
+                ops.push(prism(
+                    id + 24,
+                    "sketch",
+                    top_frame,
+                    circle(r),
+                    vec![],
+                    (-(sd + gap), 1.0),
+                    0.0,
+                    Mode::Cut,
+                    lbl("alignment recess"),
+                ));
+            }
+        }
+        let above = if step == "out" { sd } else { 0.0 };
         match hole {
             "pilot" => {
                 if hdepth > h + base - bottom.unwrap_or(f64::NEG_INFINITY) - EPS {
@@ -387,7 +454,7 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
                     at,
                     circle(dd / 2.0),
                     vec![],
-                    (from, h + 1.0),
+                    (from, h + above + 1.0),
                     -hda.to_degrees(),
                     Mode::Cut,
                     lbl("hole"),
@@ -414,7 +481,7 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
                     at,
                     circle(dd / 2.0),
                     vec![],
-                    (from, h + 1.0),
+                    (from, h + above + 1.0),
                     -hda.to_degrees(),
                     Mode::Cut,
                     lbl("hole"),
@@ -507,13 +574,57 @@ fn mate_ops(
         Mode::Join,
         lbl("shank"),
     ));
+    let (step, sdia, sd, gap) = (
+        req.choice("step")?,
+        p("step_diameter")?,
+        p("step_depth")?,
+        p("gap")?,
+    );
+    match step {
+        "out" => {
+            if sd + gap >= len - EPS
+                || sdia / 2.0 + gap >= md / 2.0 - len * da.to_radians().tan() - EPS
+            {
+                return Err(invalid(
+                    F,
+                    "the mating recess for the alignment step does not fit the mating boss",
+                ));
+            }
+            ops.push(prism(
+                id + 25,
+                "mate",
+                at,
+                c(sdia / 2.0 + gap),
+                vec![],
+                (len - sd - gap, len + 1.0),
+                0.0,
+                Mode::Cut,
+                lbl("alignment recess"),
+            ));
+        }
+        "in" => {
+            ops.push(prism(
+                id + 25,
+                "mate",
+                at.offset(len),
+                c(sdia / 2.0),
+                vec![],
+                (0.0, sd),
+                0.0,
+                Mode::Join,
+                lbl("alignment step"),
+            ));
+        }
+        _ => {}
+    }
+    let tip_extra = if step == "in" { sd } else { 0.0 };
     ops.push(prism(
         id + 17,
         "mate",
         at,
         c(mh / 2.0),
         vec![],
-        (out - 1.0, len + 1.0),
+        (out - 1.0, len + tip_extra + 1.0),
         0.0,
         Mode::Cut,
         lbl("clearance hole"),

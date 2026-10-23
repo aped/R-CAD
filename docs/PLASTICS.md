@@ -93,9 +93,10 @@ sketch and facing it.
   axis), `rib_height` (6), `rib_chamfer` (3), `rib_tip_height` (2), `rib_angle_deg` (0), `rib_total_deg` (360);
 - mating boss: `mate_diameter` (6), `mate_hole_diameter` (3.4), `cbore_diameter` (6),
   `cbore_depth` (0: none), `gap` (*rule* `CL`);
-- `tip_radius` (0: none): fillet of the shank top's outer edge.
+- `tip_radius` (0: none): fillet of the shank top's outer edge;
+- alignment step: `step_diameter` (4.5), `step_depth` (1).
 
-**Choices:** `hole`: `pilot` | `through` | `none`.
+**Choices:** `hole`: `pilot` | `through` | `none`; `step` (side 1): `none` | `out` | `in`.
 
 **Result.** Per point:
 - a drafted shank from the base face (the nearest face at or below the sketch plane facing it)
@@ -121,12 +122,15 @@ With `mate`, the other body also gets:
 - a mate face that is not parallel and facing;
 - no room for the mating shank.
 
+**Alignment step** (Fusion's Step In/Out). `out` puts a ring of `step_diameter` × `step_depth`
+on each shank top and a recess `gap` wider and deeper in the mating boss; `in` is the reverse.
+
 **Tip fillet.** An exact cap-loop blend of the shank top, applied last (docs/FILLETS.md). The
 kernel refuses it where gussets reach the top, the hole is within the radius of the edge, or the
 shank is drafted.
 
 **Not modelled:** root fillets (the kernel blends convex cap loops, not the concave base edge),
-drafted ribs, countersinks, alignment steps, fastener components.
+drafted ribs, countersinks, fastener components.
 
 ## Rib and Web
 
