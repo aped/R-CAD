@@ -40,22 +40,107 @@ pub fn schema() -> FeatureSchema {
         description: "Cantilever hooks at sketch points with a mating groove or loop".into(),
         inputs: vec![
             input("sketch", "Sketch points", InputKind::Sketch, false),
-            input("mate", "Mating body (groove or loop)", InputKind::Body, true),
+            input(
+                "mate",
+                "Mating body (groove or loop)",
+                InputKind::Body,
+                true,
+            ),
         ],
         params: vec![
             param("length", "Beam length", Length, 8.0, pos, None, None),
-            param("thickness", "Beam thickness at the root", Length, 1.0, pos, None, Some("T/2")),
-            param("tip_thickness", "Beam thickness at the tip", Length, 1.0, pos, None, Some("T/2")),
+            param(
+                "thickness",
+                "Beam thickness at the root",
+                Length,
+                1.0,
+                pos,
+                None,
+                Some("T/2"),
+            ),
+            param(
+                "tip_thickness",
+                "Beam thickness at the tip",
+                Length,
+                1.0,
+                pos,
+                None,
+                Some("T/2"),
+            ),
             param("width", "Width", Length, 5.0, pos, None, None),
-            param("catch_depth", "Catch depth", Length, 0.7, pos, None, Some("T/3")),
-            param("catch_height", "Catch height", Length, 2.0, pos, None, Some("T")),
-            param("insertion_deg", "Insertion angle", Angle, 30.0, Some((0.0, true)), Some(80.0), None),
-            param("retention_deg", "Retention angle", Angle, 90.0, Some((0.0, true)), Some(90.0), None),
+            param(
+                "catch_depth",
+                "Catch depth",
+                Length,
+                0.7,
+                pos,
+                None,
+                Some("T/3"),
+            ),
+            param(
+                "catch_height",
+                "Catch height",
+                Length,
+                2.0,
+                pos,
+                None,
+                Some("T"),
+            ),
+            param(
+                "insertion_deg",
+                "Insertion angle",
+                Angle,
+                30.0,
+                Some((0.0, true)),
+                Some(80.0),
+                None,
+            ),
+            param(
+                "retention_deg",
+                "Retention angle",
+                Angle,
+                90.0,
+                Some((0.0, true)),
+                Some(90.0),
+                None,
+            ),
             param("rotation_deg", "Rotation", Angle, 0.0, None, None, None),
-            param("base_depth", "Stand-off depth (parallel, distance)", Length, 5.0, pos, None, None),
-            param("clearance", "Clearance", Length, 0.1, Some((0.0, false)), None, Some("CL")),
-            param("loop_thickness", "Loop thickness", Length, 1.5, pos, None, None),
-            param("loop_length", "Loop length past the catch", Length, 3.0, pos, None, None),
+            param(
+                "base_depth",
+                "Stand-off depth (parallel, distance)",
+                Length,
+                5.0,
+                pos,
+                None,
+                None,
+            ),
+            param(
+                "clearance",
+                "Clearance",
+                Length,
+                0.1,
+                Some((0.0, false)),
+                None,
+                Some("CL"),
+            ),
+            param(
+                "loop_thickness",
+                "Loop thickness",
+                Length,
+                1.5,
+                pos,
+                None,
+                None,
+            ),
+            param(
+                "loop_length",
+                "Loop length past the catch",
+                Length,
+                3.0,
+                pos,
+                None,
+                None,
+            ),
         ],
         choices: vec![
             choice("type", "Type", &["hook_and_groove", "hook_and_loop"]),
@@ -79,9 +164,17 @@ struct Hook {
 
 fn hook(req: &BuildRequest, y0: f64) -> Result<Hook, PluginError> {
     let p = |n: &str| req.param(n);
-    let (l, a, c, w) = (p("length")?, p("thickness")?, p("tip_thickness")?, p("width")?);
+    let (l, a, c, w) = (
+        p("length")?,
+        p("thickness")?,
+        p("tip_thickness")?,
+        p("width")?,
+    );
     let (fd, h) = (p("catch_depth")?, p("catch_height")?);
-    let (ins, ret) = (p("insertion_deg")?.to_radians(), p("retention_deg")?.to_radians());
+    let (ins, ret) = (
+        p("insertion_deg")?.to_radians(),
+        p("retention_deg")?.to_radians(),
+    );
     if h >= l - EPS {
         return Err(invalid(F, "the catch must be shorter than the beam"));
     }
@@ -126,7 +219,10 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
     let p = |n: &str| req.param(n);
     let s = req.sketch("sketch")?;
     if s.body.is_none() {
-        return Err(invalid(F, "the sketch must lie on a face of the hook body (or a plane offset from one)"));
+        return Err(invalid(
+            F,
+            "the sketch must lie on a face of the hook body (or a plane offset from one)",
+        ));
     }
     let pts = placement_points(s);
     if pts.is_empty() {
@@ -136,7 +232,10 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
         "parallel" => {
             let d = match req.choice("extent")? {
                 "to_next" => -next_below(&s.parallel, 0.0, EPS).ok_or_else(|| {
-                    invalid(F, "to next: no face of the body below the sketch plane faces it")
+                    invalid(
+                        F,
+                        "to next: no face of the body below the sketch plane faces it",
+                    )
                 })?,
                 _ => p("base_depth")?,
             };
@@ -144,7 +243,10 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
         }
         _ => {
             if next_below(&s.parallel, EPS, 0.0).is_none_or(|h| h.abs() > EPS) {
-                return Err(invalid(F, "a perpendicular hook stands on the face its sketch lies on"));
+                return Err(invalid(
+                    F,
+                    "a perpendicular hook stands on the face its sketch lies on",
+                ));
             }
             -SINK
         }
@@ -164,7 +266,9 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
             id,
             "sketch",
             f,
-            Profile::Polygon { points: hk.section.clone() },
+            Profile::Polygon {
+                points: hk.section.clone(),
+            },
             vec![],
             (-half, half),
             0.0,
@@ -177,22 +281,48 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
         if kind == "hook_and_groove" {
             let x_in = hk.x_root.min(hk.x_out) - cl;
             let win = rcad_plugin::geom::rect(
-                [(x_in + hk.x_out + cl) / 2.0, (hk.v0 - cl + hk.tip + cl) / 2.0],
+                [
+                    (x_in + hk.x_out + cl) / 2.0,
+                    (hk.v0 - cl + hk.tip + cl) / 2.0,
+                ],
                 hk.x_out + cl - x_in,
                 hk.tip - hk.v0 + 2.0 * cl,
                 0.0,
             );
-            ops.push(prism(id + 1, "mate", f, win, vec![], (-half - cl, half + cl), 0.0, Mode::Cut, lbl("groove")));
+            ops.push(prism(
+                id + 1,
+                "mate",
+                f,
+                win,
+                vec![],
+                (-half - cl, half + cl),
+                0.0,
+                Mode::Cut,
+                lbl("groove"),
+            ));
         } else {
             let (lt, ll) = (p("loop_thickness")?, p("loop_length")?);
             let x0 = hk.x_root + cl;
             let x1 = hk.x_out + ll;
             let y1 = hk.v0 - cl;
             if y1 - lt <= 0.0 {
-                return Err(invalid(F, "the loop does not fit between the sketch plane and the catch"));
+                return Err(invalid(
+                    F,
+                    "the loop does not fit between the sketch plane and the catch",
+                ));
             }
             let bar = rcad_plugin::geom::rect([(x0 + x1) / 2.0, y1 - lt / 2.0], x1 - x0, lt, 0.0);
-            ops.push(prism(id + 1, "mate", f, bar, vec![], (-half - cl - lt, half + cl + lt), 0.0, Mode::Join, lbl("loop")));
+            ops.push(prism(
+                id + 1,
+                "mate",
+                f,
+                bar,
+                vec![],
+                (-half - cl - lt, half + cl + lt),
+                0.0,
+                Mode::Join,
+                lbl("loop"),
+            ));
         }
     }
     Ok(ops)

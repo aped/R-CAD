@@ -2,7 +2,10 @@
 //! (docs/PLASTICS.md): closed-form volumes, point probes, parameter edits,
 //! rule bindings, refusals, undo and save/reload.
 mod boss;
+mod lip;
+mod rest;
 mod ribweb;
+mod snap;
 
 use rcad_commands::plugins::PluginFeatureCmd;
 use rcad_commands::{Command, Response, Session, SketchTemplate};
@@ -150,4 +153,56 @@ pub fn sketch_in(f: FeatureId) -> PluginInput {
 
 pub fn face_in(plane: SketchPlane) -> PluginInput {
     PluginInput::Face { plane }
+}
+
+/// 60×40×20 box (z 0..20) shelled open at the top, walls and floor 2 thick:
+/// cavity x ±28, y ±18, z 2..20. Returns (session, extrusion).
+pub fn open_box() -> (Session, FeatureId) {
+    let mut s = Session::new();
+    ok(&mut s, Command::NewDocument);
+    let e = plate(&mut s, SketchPlane::WorldXY, 60.0, 40.0, 20.0);
+    ok(
+        &mut s,
+        Command::ShellFace {
+            name: None,
+            face: FaceRef {
+                feature: e,
+                role: FaceRole::ExtrudeEndCap,
+            },
+            thickness: 2.0,
+        },
+    );
+    (s, e)
+}
+
+pub const BOX: f64 = 60.0 * 40.0 * 20.0 - 56.0 * 36.0 * 18.0;
+
+pub fn line_sketch(
+    s: &mut Session,
+    plane: SketchPlane,
+    lines: &[([f64; 2], [f64; 2])],
+) -> FeatureId {
+    let mut sk = rcad_sketch::Sketch::default();
+    for (a, b) in lines {
+        let p = sk.add_point(a[0], a[1]);
+        let q = sk.add_point(b[0], b[1]);
+        sk.add_line(p, q);
+        for (id, v) in [(p, a), (q, b)] {
+            sk.constraints.push(rcad_sketch::Constraint::FixedPoint {
+                p: id,
+                x: v[0],
+                y: v[1],
+            });
+        }
+    }
+    ok(
+        s,
+        Command::CreateSketch {
+            name: None,
+            plane,
+            template: SketchTemplate::Custom { sketch: sk },
+        },
+    )
+    .feature
+    .unwrap()
 }

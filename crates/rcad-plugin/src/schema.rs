@@ -269,6 +269,9 @@ pub fn check_value(p: &ParamSchema, v: f64) -> Result<(), String> {
     Ok(())
 }
 
+/// Complete parameters and choices of a request.
+pub type Completed = (BTreeMap<String, f64>, BTreeMap<String, String>);
+
 /// Fill defaults and check given values against a feature's or analysis's
 /// declaration: every given name must be declared, every value in range,
 /// every choice one of its values. Returns the complete maps.
@@ -278,7 +281,7 @@ pub fn complete(
     choices: &[ChoiceSchema],
     given: &BTreeMap<String, f64>,
     given_choices: &BTreeMap<String, String>,
-) -> Result<(BTreeMap<String, f64>, BTreeMap<String, String>), PluginError> {
+) -> Result<Completed, PluginError> {
     for n in given.keys() {
         if !params.iter().any(|p| &p.name == n) {
             return Err(PluginError::Input(format!(

@@ -30,10 +30,42 @@ pub fn schema() -> FeatureSchema {
         description: "Flat platform with uniform walls inside a shelled part".into(),
         inputs: vec![input("sketch", "Sketch profiles", InputKind::Sketch, false)],
         params: vec![
-            param("thickness", "Wall thickness", ParamKind::Length, 2.0, pos, None, Some("T")),
-            param("offset", "Top offset", ParamKind::Length, 0.0, None, None, None),
-            param("depth", "Depth below the sketch (distance)", ParamKind::Length, 10.0, pos, None, None),
-            param("draft_deg", "Draft", ParamKind::Angle, 0.0, Some((0.0, false)), Some(30.0), Some("DA")),
+            param(
+                "thickness",
+                "Wall thickness",
+                ParamKind::Length,
+                2.0,
+                pos,
+                None,
+                Some("T"),
+            ),
+            param(
+                "offset",
+                "Top offset",
+                ParamKind::Length,
+                0.0,
+                None,
+                None,
+                None,
+            ),
+            param(
+                "depth",
+                "Depth below the sketch (distance)",
+                ParamKind::Length,
+                10.0,
+                pos,
+                None,
+                None,
+            ),
+            param(
+                "draft_deg",
+                "Draft",
+                ParamKind::Angle,
+                0.0,
+                Some((0.0, false)),
+                Some(30.0),
+                Some("DA"),
+            ),
         ],
         choices: vec![choice("extent", "Extent", &["to_next", "distance"])],
     }
@@ -42,13 +74,24 @@ pub fn schema() -> FeatureSchema {
 pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
     let s = req.sketch("sketch")?;
     if s.body.is_none() {
-        return Err(invalid(F, "the sketch must lie on a plane offset from a face of the body"));
+        return Err(invalid(
+            F,
+            "the sketch must lie on a plane offset from a face of the body",
+        ));
     }
-    let (t, o, a) = (req.param("thickness")?, req.param("offset")?, req.param("draft_deg")?.to_radians());
+    let (t, o, a) = (
+        req.param("thickness")?,
+        req.param("offset")?,
+        req.param("draft_deg")?.to_radians(),
+    );
     // Floor height below the sketch plane (< 0), and the outside face under it.
     let floor = match req.choice("extent")? {
-        "to_next" => next_below(&s.parallel, 0.0, EPS)
-            .ok_or_else(|| invalid(F, "to next: no face of the body below the sketch plane faces it"))?,
+        "to_next" => next_below(&s.parallel, 0.0, EPS).ok_or_else(|| {
+            invalid(
+                F,
+                "to next: no face of the body below the sketch plane faces it",
+            )
+        })?,
         _ => -req.param("depth")?,
     };
     let bottom = s
@@ -61,7 +104,10 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
     let top = o;
     let rise = top - floor;
     if rise <= t + EPS {
-        return Err(invalid(F, format!("the top is {rise:.3} mm above the floor; it must be more than the thickness")));
+        return Err(invalid(
+            F,
+            format!("the top is {rise:.3} mm above the floor; it must be more than the thickness"),
+        ));
     }
     let base = s.frame.offset(floor);
     let mut ops = Vec::new();
@@ -70,13 +116,38 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
         let lbl = |w: &str| format!("rest {}: {w}", k + 1);
         // Solid: exact at the top, `rise·tan(a)` wider at the floor.
         let solid = p.offset(rise * a.tan()).map_err(|e| invalid(F, e))?;
-        ops.push(prism(id, "sketch", base, solid.clone(), vec![], (0.0, rise), a.to_degrees(), Mode::Join, lbl("walls")));
+        ops.push(prism(
+            id,
+            "sketch",
+            base,
+            solid.clone(),
+            vec![],
+            (0.0, rise),
+            a.to_degrees(),
+            Mode::Join,
+            lbl("walls"),
+        ));
         // Inside: from below the floor (height `bottom - 1`) to `t` under the top.
         let from = bottom - 1.0 - floor;
         let inside = p
             .offset((top - (floor + from)) * a.tan() - t)
-            .map_err(|e| invalid(F, format!("the thickness {t} mm does not fit the profile ({e})")))?;
-        ops.push(prism(id + 1, "sketch", base, inside, vec![], (from, rise - t), a.to_degrees(), Mode::Cut, lbl("inside")));
+            .map_err(|e| {
+                invalid(
+                    F,
+                    format!("the thickness {t} mm does not fit the profile ({e})"),
+                )
+            })?;
+        ops.push(prism(
+            id + 1,
+            "sketch",
+            base,
+            inside,
+            vec![],
+            (from, rise - t),
+            a.to_degrees(),
+            Mode::Cut,
+            lbl("inside"),
+        ));
     }
     Ok(ops)
 }

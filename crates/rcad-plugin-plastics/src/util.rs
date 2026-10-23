@@ -97,7 +97,10 @@ pub fn closed_profiles(f: &str, s: &rcad_plugin::SketchGeom) -> Result<Vec<Profi
             Curve::Circle { center, radius } => out.push(Profile::Circle { center, radius }),
             Curve::Line { a, b } => lines.push((a, b)),
             Curve::Arc { .. } => {
-                return Err(unsupported(f, "profiles with arcs are not supported (circles and line loops are)"));
+                return Err(unsupported(
+                    f,
+                    "profiles with arcs are not supported (circles and line loops are)",
+                ));
             }
         }
     }
@@ -116,12 +119,17 @@ pub fn closed_profiles(f: &str, s: &rcad_plugin::SketchGeom) -> Result<Vec<Profi
                 break;
             }
             pts.push(at);
-            let next = (0..lines.len()).find(|&j| !used[j] && (same(lines[j].0, at) || same(lines[j].1, at)));
+            let next = (0..lines.len())
+                .find(|&j| !used[j] && (same(lines[j].0, at) || same(lines[j].1, at)));
             let Some(j) = next else {
                 return Err(invalid(f, "the sketch lines do not form closed loops"));
             };
             used[j] = true;
-            at = if same(lines[j].0, at) { lines[j].1 } else { lines[j].0 };
+            at = if same(lines[j].0, at) {
+                lines[j].1
+            } else {
+                lines[j].0
+            };
         }
         if pts.len() < 3 {
             return Err(invalid(f, "a closed loop needs at least three lines"));
