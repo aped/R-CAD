@@ -5,8 +5,10 @@
 //! operations ([`rcad_plugin::Op::Prism`]), and what that cannot express
 //! exactly is refused or documented as a deviation, never approximated.
 pub mod advice;
+pub mod analyses;
 mod boss;
 mod lip;
+mod mesh_query;
 mod rest;
 mod ribweb;
 pub mod rules;
@@ -84,7 +86,12 @@ fn manifest() -> Manifest {
             lip::schema(),
             rest::schema(),
         ],
-        analyses: vec![advice::schema()],
+        analyses: vec![
+            advice::schema(),
+            analyses::draft_schema(),
+            analyses::accessibility_schema(),
+            analyses::minimum_radius_schema(),
+        ],
     }
 }
 
@@ -109,6 +116,9 @@ impl Plugin for Plastics {
     fn analyze(&self, req: &AnalysisRequest) -> Result<serde_json::Value, PluginError> {
         match req.analysis.as_str() {
             "design_advice" => advice::analyze(req),
+            "draft_analysis" => analyses::draft_analysis(req),
+            "accessibility" => analyses::accessibility(req),
+            "minimum_radius" => analyses::minimum_radius(req),
             a => Err(PluginError::NotFound(format!(
                 "plastics: no analysis '{a}'"
             ))),
