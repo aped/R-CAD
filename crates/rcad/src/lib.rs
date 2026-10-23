@@ -31,6 +31,7 @@ pub mod pattern_ui;
 #[cfg(test)]
 mod pick_tests;
 pub mod place;
+pub mod plugin_ui;
 pub mod probe;
 pub mod reattach;
 pub mod recovery;

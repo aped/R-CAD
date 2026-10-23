@@ -500,6 +500,10 @@ fn main() -> ExitCode {
             // Autosave/recovery for interactive use; scripted runs never touch
             // the recovery directory.
             if args.scene.is_none() && !args.demo && args.demo_place.is_none() {
+                // External plugins of this user (RCAD_PLUGIN_PATH, then
+                // $XDG_DATA_HOME/r-cad/plugins); scripted runs keep to the
+                // built-in ones.
+                app.load_installed_plugins();
                 app.enable_autosave();
                 // Starts nothing unless an account is configured.
                 #[cfg(feature = "cloud")]

@@ -27,6 +27,7 @@ fn glyph(kind: &str) -> &'static str {
         "mirror" => "↔",
         "thread" => "≈",
         "loft" | "sweep" => "⤴",
+        "plugin" => "⚙",
         k if k.starts_with("import") => "⬇",
         k if k.starts_with("sheet") => "⊟",
         k if k.starts_with("surface") || k == "thicken" => "◊",
@@ -97,7 +98,10 @@ impl RcadApp {
                         );
                         let name = format!("Timeline {}", f.name);
                         let r = r.named(&name);
-                        let mut tip = f.name.clone();
+                        let mut tip = match crate::plugin_ui::feature_type_name(f) {
+                            Some(t) => format!("{} ({t})", f.name),
+                            None => f.name.clone(),
+                        };
                         if let Some(m) = &f.health.message {
                             tip.push_str(&format!("\n{m}"));
                         }

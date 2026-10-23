@@ -55,7 +55,9 @@ fn literal_chars(line: &str) -> Vec<char> {
 #[test]
 fn ui_strings_use_only_glyphs_the_font_has() {
     let ctx = egui::Context::default();
-    let _ = ctx.run_ui(Default::default(), |_| {});
+    // The pass only loads the fonts; its texture upload is not needed.
+    let mut out = ctx.run_ui(Default::default(), |_| {});
+    out.textures_delta.clear();
     let font = FontId::new(14.0, FontFamily::Proportional);
     let mut files = vec![];
     sources(

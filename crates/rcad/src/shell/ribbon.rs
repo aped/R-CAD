@@ -43,6 +43,8 @@ fn caption(label: &str) -> &str {
         "Export STL…" => "STL",
         "Export 3MF…" => "3MF",
         "New Component" => "Component",
+        "Manage Plastic Rules…" => "Rules",
+        "Assign Plastic Rule…" => "Assign",
         l => l.trim_end_matches('…'),
     }
 }
@@ -496,6 +498,26 @@ impl RcadApp {
     /// scripts and tests open by name).
     fn ribbon_extras(&mut self, ui: &mut Ui, tab: Tab, g: Group) {
         use CmdId as C;
+        if tab == Tab::Utilities && g == Group::Plugins {
+            // Every feature of every installed plugin (external plugins
+            // appear here without code changes).
+            let r = ui
+                .add_enabled(
+                    self.summary.open,
+                    IconButton {
+                        icon: Some(Icon::Plugin),
+                        caption: "Features",
+                        name: "Plugin features",
+                        small: false,
+                        dropdown: true,
+                    },
+                )
+                .probe("Plugin features")
+                .on_hover_text("Create a feature of any installed plugin")
+                .on_disabled_hover_text("Create or open a document first");
+            egui::Popup::menu(&r).show(|ui| self.plugin_features_menu(ui));
+            return;
+        }
         if tab != Tab::Solid {
             return;
         }

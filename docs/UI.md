@@ -120,7 +120,7 @@ external exchange"; tests `crates/rcad/tests/import_cancel_ui.rs`, `stale_state.
 
 * **Edit Feature** (History double-click or right-click ▸ Edit Feature) reopens the feature's
   dialog prefilled for Extrude, Revolve, Hole, Fillet / Chamfer (edge and loop), Shell (face and
-  scoped), Linear / Circular pattern, Mirror, Loft, Sweep, Thread and Align. A bound value shows its
+  scoped), Linear / Circular pattern, Mirror, Loft, Sweep, Thread, Align and plugin features. A bound value shows its
   expression; OK is one `RedefineFeature` (same id and history position, one undo step), and values
   the dialog does not show (created bodies, a nut's clearance, a mirror plane's tilt, an align
   offset) are kept. The pattern type is fixed while editing. A definition a dialog cannot show (a
@@ -158,6 +158,37 @@ external exchange"; tests `crates/rcad/tests/import_cancel_ui.rs`, `stale_state.
 * **Glyphs:** `tests/it/glyphs.rs` fails on any character in the app's string literals that the UI
   font cannot draw (it would show as an empty box).
 UI tests: `crates/rcad/tests/it/first_run_ui.rs`, `edit_feature_ui.rs`, `glyphs.rs`, `polish_ui.rs`, `value_labels.rs`.
+
+## Plugins and the PLASTIC tab
+
+* **Plugin feature dialog** (`plugin_ui/feature.rs`): one docked command dialog for every feature
+  type a plugin declares, built from its manifest (docs/PLUGINS.md). A Face input takes the next
+  face picked in the view (Select / × per input, like Hole's face), Faces collect picks, a Body or a
+  Sketch is chosen from a list (the selected or last sketch is preselected), Points are typed
+  (`x, y; x, y` in the face's plane). Parameters are value fields of their declared unit (mm, deg,
+  count, ratio) that take expressions; choices are combo boxes. OK sends `PluginFeature`. For a new
+  feature, a field left as it opened is omitted from the command, so when the feature's body has a
+  plastic rule the slot binds to the rule (the field shows `rule: T/2 = ABS_T/2`); a typed value or
+  expression replaces it. Edit Feature reopens the dialog with the stored values (bound slots show
+  their expression) and commits one `RedefineFeature`.
+* **PLASTIC tab** (Fusion's Plastic tab): SETUP (Manage Plastic Rules…, Assign Plastic Rule…),
+  CREATE (Boss, Rib, Web, Snap Fit, Lip, Rest: the generic dialog for the `plastics` plugin's
+  features), INSPECT (Design Advice…). Manage Plastic Rules lists the rules, adds one from a preset
+  (typical values, not supplier data) or blank, edits each value as an expression over the rule's
+  symbols and its material, and deletes; Apply stores the whole data with one `SetPluginData` (one
+  undo step; the rule's parameters `<Rule>_T`, … and materials with it). Assign Plastic Rule puts a
+  body under a rule or none. Code `plugin_ui/plastic_rules.rs`.
+* **Analysis window** (`plugin_ui/analysis.rs`; Design Advice): body, an optional pull face (Use
+  selected face) or the pull axis, limits (unchanged ones follow the body's rule), Run
+  (`RunPluginAnalysis`). The report's summary (thickness, areas too thin / thick, variation, draft,
+  undercut, knife edges) is labelled approximate with the report's own note; clicking an alert
+  selects its face.
+* **Any plugin:** UTILITIES ▸ PLUGINS ▸ Features lists every feature of every installed plugin
+  (external plugins appear without code changes); **Plugins…** lists id, name, version, built-in or
+  external, features, analyses and load errors. External plugins load once at start of an
+  interactive run (`RCAD_PLUGIN_PATH`, then `$XDG_DATA_HOME/r-cad/plugins`); tests and scripted
+  scenes never load them. History and the timeline show a plugin feature's type name ("Boss").
+* UI test: `crates/rcad/tests/it/plastics_ui.rs`; live script `tools/live/z_plastics.txt`.
 
 ## Cloud (optional server tier)
 

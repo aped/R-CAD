@@ -196,6 +196,20 @@ pub struct Reply {
     /// Deferred-measurement follow-up (not the answer to a submitted command):
     /// `measurements` describe `summary.doc_id` / `summary.revision`.
     pub followup: bool,
+    /// Plugin-owned document data after the command (plugin id -> data, e.g.
+    /// the plastic rules), for the plugin dialogs. Empty without a document.
+    pub plugin_data: PluginData,
+}
+
+/// Plugin id -> that plugin's document data.
+pub type PluginData = std::collections::BTreeMap<String, serde_json::Value>;
+
+/// The open document's plugin data.
+pub fn plugin_data(session: &Session) -> PluginData {
+    session
+        .model()
+        .map(|m| m.document().plugin_data.clone())
+        .unwrap_or_default()
 }
 
 impl Reply {
@@ -256,6 +270,7 @@ fn superseded_reply(session: &Session, cmd: Command, key: &str) -> Reply {
             .and_then(|m| m.evaluation().measurements.clone()),
         mesh: MeshUpdate::Unchanged,
         followup: false,
+        plugin_data: plugin_data(session),
     }
 }
 
@@ -339,6 +354,7 @@ fn cancelled_reply(session: &Session, cmd: Command) -> Reply {
             .and_then(|m| m.evaluation().measurements.clone()),
         mesh: MeshUpdate::Unchanged,
         followup: false,
+        plugin_data: plugin_data(session),
     }
 }
 
@@ -372,6 +388,7 @@ pub fn execute(session: &mut Session, cmd: Command) -> Reply {
         measurements,
         mesh,
         followup: false,
+        plugin_data: plugin_data(session),
     }
 }
 
@@ -621,6 +638,7 @@ fn adopt(session: &mut Session, (doc_id, revision, ok, failed): Measured) -> Opt
             .and_then(|m| m.evaluation().measurements.clone()),
         mesh: MeshUpdate::Unchanged,
         followup: true,
+        plugin_data: plugin_data(session),
     })
 }
 

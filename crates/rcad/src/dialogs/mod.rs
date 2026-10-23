@@ -117,6 +117,12 @@ pub fn slot_of(label: &str) -> SlotKind {
 /// the document's parameter names (`w/2`, `10 mm + t`, `1 in`). Lengths in
 /// mm, angles in degrees.
 pub fn check_value(label: &str, src: &str) -> Result<f64, String> {
+    check_value_as(slot_of(label), src)
+}
+
+/// [`check_value`] for a value of a known kind (plugin parameters declare
+/// theirs rather than implying it by the label).
+pub fn check_value_as(kind: SlotKind, src: &str) -> Result<f64, String> {
     let s = src.trim();
     if s.is_empty() {
         return Err("is empty".into());
@@ -128,7 +134,6 @@ pub fn check_value(label: &str, src: &str) -> Result<f64, String> {
             Err("is not finite".into())
         };
     }
-    let kind = slot_of(label);
     let v = ENV.with(|e| rcad_document::params::evaluate_for_slot(s, &e.borrow(), kind))?;
     if v.is_finite() {
         Ok(v)

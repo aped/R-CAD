@@ -1,0 +1,51 @@
+# keymap: fusion
+# PLASTIC tab with real input: a 40 x 30 x 4 plate (ribbon sketch on XY,
+# R / D keys, E), the ABS preset added in Manage Plastic Rules and stored
+# (rule parameters ABS_T, ...), the rule assigned to the plate (material ABS),
+# then Design Advice run on it (a 4 mm plate is above the default 3 mm
+# maximum: thickness alerts). Undo removes the assignment.
+clickw New
+wait_idle
+clickw Planes
+clickw Sketch on XY
+wait_idle
+key r
+sclick 0.3 0.2
+smove 40 30
+sclick 40 30
+key d
+sclick 20 0
+type 40
+key Return
+sclick 40 15
+type 30
+key Return
+expect editing.dims 2
+clickw FINISH SKETCH
+wait_idle
+key e
+typew Extrude distance (mm) | 4
+key Return
+wait_idle
+expect volume 4800 0.01
+clickw PLASTIC tab
+shot
+clickw Manage Plastic Rules…
+clickw Add rule
+shot
+clickw Apply rules
+wait_idle
+expect last_reply.ok true
+clickw Assign Plastic Rule…
+clickw Assign rule
+wait_idle
+expect last_reply.ok true
+clickw Design Advice…
+clickw Run analysis
+wait_idle
+expect last_reply.ok true
+shot
+key ctrl+z
+wait_idle
+expect last_reply.ok true
+expect volume 4800 0.01

@@ -206,6 +206,17 @@ pub(crate) fn redefined(dlg: &Dialog, old: &FeatureKind) -> Result<FeatureKind, 
                 target: *target,
             })
         }
+        (
+            Dialog::PluginFeature(form),
+            FeatureKind::Plugin {
+                plugin, feature, ..
+            },
+        ) => {
+            if form.plugin != *plugin || form.feature != *feature {
+                return Err("this dialog cannot redefine that feature".into());
+            }
+            form.definition()
+        }
         _ => kind_from_command(crate::app::build_command(dlg)?, old),
     }
 }
@@ -675,6 +686,11 @@ pub(crate) fn typed_expressions(
             // Without a nut there is no nut_width parameter to bind.
             put("nut_width", if *nut { nut_width } else { "" });
         }
+        Dialog::PluginFeature(f) => {
+            for p in &f.params {
+                put(&p.name, &p.text);
+            }
+        }
         _ => {}
     }
     (!m.is_empty() || !old.is_empty()).then_some(m)
@@ -754,6 +770,21 @@ impl RcadApp {
                     offset: fmt_value(offset),
                 })
             }
+            Some(def @ FeatureKind::Plugin { plugin, .. }) => match self.plugins.find(plugin) {
+                Some(info) => crate::plugin_ui::feature::PluginForm::from_definition(
+                    info,
+                    def,
+                    &f.expressions,
+                )
+                .map(Dialog::PluginFeature),
+                None => {
+                    self.notify(format!(
+                        "Edit Feature: {} needs plugin '{plugin}', which is not installed",
+                        f.name
+                    ));
+                    return;
+                }
+            },
             Some(def) => prefill(def, &f.expressions),
             None => None,
         };

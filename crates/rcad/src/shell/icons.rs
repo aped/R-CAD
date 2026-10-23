@@ -423,6 +423,82 @@ pub fn paint(icon: Icon, p: &Painter, rect: Rect, c: Color32) {
         Icon::Generic => {
             circle(0.5, 0.5, 0.25, None);
         }
+        // Plastic parts: a floor plate with the feature standing on it.
+        Icon::Rules => {
+            p.rect_stroke(
+                rect_at(0.2, 0.12, 0.8, 0.88),
+                1.0,
+                st,
+                eframe::egui::StrokeKind::Inside,
+            );
+            for y in [0.32, 0.5, 0.68] {
+                line((0.32, y), (0.68, y));
+            }
+            p.rect_filled(rect_at(0.2, 0.12, 0.8, 0.2), 0.0, NOTE);
+        }
+        Icon::Boss => {
+            p.rect_filled(rect_at(0.1, 0.78, 0.9, 0.9), 0.0, BODY);
+            p.rect_filled(rect_at(0.32, 0.25, 0.68, 0.78), 0.0, ADD);
+            p.rect_filled(rect_at(0.45, 0.25, 0.55, 0.62), 0.0, CUT);
+            line((0.32, 0.25), (0.68, 0.25));
+        }
+        Icon::Rib => {
+            p.rect_filled(rect_at(0.1, 0.78, 0.9, 0.9), 0.0, BODY);
+            p.rect_filled(rect_at(0.1, 0.15, 0.22, 0.78), 0.0, BODY);
+            poly(&[(0.22, 0.25), (0.22, 0.78), (0.75, 0.78)], ADD);
+        }
+        Icon::Web => {
+            p.rect_filled(rect_at(0.1, 0.78, 0.9, 0.9), 0.0, BODY);
+            for x in [0.25, 0.5, 0.75] {
+                p.rect_filled(rect_at(x - 0.04, 0.3, x + 0.04, 0.78), 0.0, ADD);
+            }
+            line((0.2, 0.3), (0.8, 0.3));
+        }
+        Icon::SnapFit => {
+            p.rect_filled(rect_at(0.1, 0.78, 0.9, 0.9), 0.0, BODY);
+            poly(
+                &[
+                    (0.4, 0.78),
+                    (0.4, 0.15),
+                    (0.62, 0.3),
+                    (0.5, 0.3),
+                    (0.5, 0.78),
+                ],
+                ADD,
+            );
+        }
+        Icon::Lip => {
+            // Two rim sections, lip into groove.
+            p.rect_filled(rect_at(0.15, 0.55, 0.4, 0.9), 0.0, BODY);
+            p.rect_filled(rect_at(0.22, 0.38, 0.33, 0.55), 0.0, ADD);
+            p.rect_filled(rect_at(0.6, 0.1, 0.85, 0.45), 0.0, BODY);
+            p.rect_filled(rect_at(0.67, 0.45, 0.78, 0.55), 0.0, CUT);
+        }
+        Icon::Rest => {
+            line((0.1, 0.2), (0.1, 0.88));
+            line((0.9, 0.2), (0.9, 0.88));
+            line((0.1, 0.88), (0.9, 0.88));
+            p.rect_filled(rect_at(0.3, 0.45, 0.7, 0.55), 0.0, ADD);
+            line((0.35, 0.55), (0.35, 0.88));
+            line((0.65, 0.55), (0.65, 0.88));
+        }
+        Icon::Advice => {
+            block(BODY);
+            circle(0.68, 0.32, 0.2, Some(NOTE));
+            line((0.68, 0.22), (0.68, 0.34));
+            line((0.68, 0.4), (0.68, 0.42));
+        }
+        Icon::Plugin => {
+            // A puzzle-like piece: square with a tab and a notch.
+            p.rect_stroke(
+                rect_at(0.2, 0.3, 0.72, 0.82),
+                1.0,
+                st,
+                eframe::egui::StrokeKind::Inside,
+            );
+            circle(0.46, 0.22, 0.09, Some(ADD));
+            circle(0.8, 0.56, 0.09, Some(ADD));
+        }
     }
     let _ = vec2;
 }
