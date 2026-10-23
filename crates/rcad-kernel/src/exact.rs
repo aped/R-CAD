@@ -197,6 +197,9 @@ pub(crate) fn exact_edge(
         return Err(unsupported("intersection with a non-NURBS surface"));
     };
     if !is_extrusion_along(ns, n) {
+        if let Ok(c) = plane_conic_edge(ic, plane, ns, p0, p1) {
+            return Ok(c);
+        }
         return plane_ruling_edge(ic, plane, other, p0, p1).map_err(|e| {
             KernelError::InvalidInput(format!(
                 "exact intersection unsupported: curved face is not extruded along the plane \
@@ -518,4 +521,121 @@ pub(crate) fn exactify(solid: &Solid) -> (Option<Solid>, ExactifyStats) {
             (None, stats)
         }
     }
+}
+
+/// A plane meets a quadric (e.g. the lofted cone of a drafted round tool)
+/// in a conic: the edge from `p0` to `p1` is rebuilt as the rational
+/// quadratic Bézier through them with their exact tangents (plane normal ×
+/// surface normal) meeting at the middle control point, its weight fixed by
+/// the shoulder point (the surface hit on the line from the chord's middle
+/// towards that control point, found by a secant search). Verified: the
+/// rebuilt curve lies on the plane and on the surface at interior samples,
+/// and the original edge's samples lie on it in order. A non-quadric fails
+/// the verification and is refused.
+fn plane_conic_edge(
+    ic: &IntersectionCurve<Leader, Surface>,
+    plane: &Plane,
+    ns: &NurbsSurface<Vector4>,
+    p0: Point3,
+    p1: Point3,
+) -> Result<Curve> {
+    let n = plane.normal().normalize();
+    let o = plane.origin();
+    if (p1 - p0).magnitude() < 1e-9 {
+        return Err(unsupported("conic: closed or zero-length edge"));
+    }
+    let near = |q: Point3| -> Option<(f64, f64)> {
+        ns.search_nearest_parameter(q, Some(grid_hint(ns, q)), 100)
+    };
+    let tangent = |q: Point3, towards: Vector3| -> Option<Vector3> {
+        let (u, v) = near(q)?;
+        let t = n.cross(ns.normal(u, v));
+        if t.magnitude() < 1e-9 {
+            return None;
+        }
+        let t = t.normalize();
+        Some(if t.dot(towards) < 0.0 { -t } else { t })
+    };
+    let (l0, l1) = ic.leader().range_tuple();
+    let sample = |k: usize, m: usize| -> Result<Point3> {
+        let l = l0 + (l1 - l0) * k as f64 / m as f64;
+        Ok(crate::icurve::search_triple(ic, l)
+            .ok_or_else(|| unsupported("cannot evaluate original edge"))?
+            .0)
+    };
+    let (q0, q1) = (sample(1, 64)?, sample(63, 64)?);
+    let t0 = tangent(p0, q0 - p0).ok_or_else(|| unsupported("conic: no tangent at the start"))?;
+    let t1 = tangent(p1, p1 - q1).ok_or_else(|| unsupported("conic: no tangent at the end"))?;
+    // Middle control point: where the end tangents meet (in the plane).
+    let w = p1 - p0;
+    let (a, b, c) = (t0.dot(t0), t0.dot(t1), t1.dot(t1));
+    let den = a * c - b * b;
+    if den.abs() < 1e-12 {
+        return Err(unsupported("conic: parallel end tangents"));
+    }
+    let (d, e) = (t0.dot(w), t1.dot(w));
+    let s = (d * c - b * e) / den;
+    if s <= 0.0 {
+        return Err(unsupported(
+            "conic: the end tangents do not meet ahead of the start",
+        ));
+    }
+    let pm = p0 + t0 * s;
+    // Shoulder: the surface point on the line from the chord middle to pm.
+    let mid = Point3::from_vec((p0.to_vec() + p1.to_vec()) / 2.0);
+    let dir = pm - mid;
+    let g = |lam: f64| -> Option<f64> {
+        let q = mid + dir * lam;
+        let (u, v) = near(q)?;
+        Some((q - ns.subs(u, v)).dot(ns.normal(u, v)))
+    };
+    let qm = sample(32, 64)?;
+    let mut lam0 = (qm - mid).dot(dir) / dir.magnitude2();
+    let mut lam1 = lam0 + 1e-3;
+    let search = || unsupported("conic: surface search failed");
+    let (mut g0, mut g1) = (g(lam0).ok_or_else(search)?, g(lam1).ok_or_else(search)?);
+    for _ in 0..60 {
+        if g1.abs() < 1e-13 || (g1 - g0).abs() < 1e-300 {
+            break;
+        }
+        let lam2 = lam1 - g1 * (lam1 - lam0) / (g1 - g0);
+        (lam0, g0) = (lam1, g1);
+        lam1 = lam2;
+        g1 = g(lam1).ok_or_else(search)?;
+    }
+    if !(g1.abs() < 1e-9 && lam1 > 0.0 && lam1 < 1.0) {
+        return Err(unsupported("conic: no shoulder point"));
+    }
+    let weight = lam1 / (1.0 - lam1);
+    let curve = NurbsCurve::new(BSplineCurve::new(
+        KnotVec::bezier_knot(2),
+        vec![
+            Vector4::new(p0.x, p0.y, p0.z, 1.0),
+            Vector4::new(pm.x * weight, pm.y * weight, pm.z * weight, weight),
+            Vector4::new(p1.x, p1.y, p1.z, 1.0),
+        ],
+    ));
+    for kk in 1..8 {
+        let q = curve.subs(kk as f64 / 8.0);
+        let on_plane = (q - o).dot(n).abs() < REBUILD_TOL;
+        let on_surface = near(q).is_some_and(|(u, v)| ns.subs(u, v).distance(q) < VERTEX_TOL);
+        if !(on_plane && on_surface) {
+            return Err(unsupported(
+                "conic: rebuilt edge does not lie on both surfaces",
+            ));
+        }
+    }
+    let mut prev = -1e-9;
+    for kk in 0..=VERIFY_SAMPLES + 1 {
+        let q = sample(kk, VERIFY_SAMPLES + 1)?;
+        let t = curve
+            .search_nearest_parameter(q, None, 100)
+            .ok_or_else(|| unsupported("conic: original point not on rebuilt edge"))?;
+        if curve.subs(t).distance(q) > VERIFY_TOL || t < prev || !(-1e-9..=1.0 + 1e-9).contains(&t)
+        {
+            return Err(unsupported("conic: rebuilt edge is not the original"));
+        }
+        prev = t;
+    }
+    Ok(Curve::NurbsCurve(curve))
 }

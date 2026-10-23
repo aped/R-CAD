@@ -314,8 +314,8 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
         if da > 0.0 {
             return Err(unsupported(
                 F,
-                "gusset ribs on a drafted shank are not supported (the kernel cannot join planar \
-                 ribs to a cone); set draft_deg to 0 or rib_count to 0",
+                "gusset ribs on a drafted shank are not supported (the kernel's join of planar \
+                 ribs to a cone is not reliable yet); set draft_deg to 0 or rib_count to 0",
             ));
         }
 
