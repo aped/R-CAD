@@ -215,7 +215,8 @@ lettered advanced dimensions.
 A lip and/or groove along the rim of a shelled part. The rim is a planar face with one outer and
 one inner boundary loop.
 
-**Inputs:** `face` (the rim); `mate` (the other half's rim, for `lip_and_groove`).
+**Inputs:** `face` (the rim); `mate` (the other half's rim, for `lip_and_groove`); `extents`
+(optional: two points on the rim).
 
 **Parameters:** `width` (*rule* `T/2`), `height` (*rule* `RH`), `clearance` (*rule* `CL`).
 
@@ -230,7 +231,12 @@ one inner boundary loop.
 **Refused:** a band not narrower than the wall; a face that is not a rim; a groove deeper than
 the part.
 
-**Not modelled:** Fusion's edge-chain selection, face guide and extents. Trapezoidal (drafted)
+**Extents.** With two points, the lip (and its groove) runs only along the rim from the first
+point to the second, counter-clockwise seen from outside the face. The band's ends are square,
+with exact offset lines and arcs and mitred corners. The rim face and `position` stand for
+Fusion's edge chain and face guide.
+
+**Not modelled:** Trapezoidal (drafted)
 sections are not available yet: the exact constructions tried (a tapered tool across the cavity,
 per-edge trapezoids, per-edge draft wedges) fail in the boolean kernel at the rim corners.
 The rim face stands for the edge chain.

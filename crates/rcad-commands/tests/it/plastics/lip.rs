@@ -106,3 +106,67 @@ fn lips_wider_than_the_wall_or_off_a_rim_are_refused() {
     assert!(m.contains("must be a rim"), "{m}");
     assert_close(vol(&s, BodyId(1)), BOX, 1e-9, "unchanged");
 }
+
+#[test]
+fn extents_make_a_partial_lip_and_groove() {
+    let (mut s, e) = open_box();
+    let lid = plate(&mut s, offset_xy(20.0), 60.0, 40.0, 10.0);
+    ok(
+        &mut s,
+        Command::ShellFace {
+            name: None,
+            face: start_cap(lid),
+            thickness: 2.0,
+        },
+    );
+    let lid_v = vol(&s, BodyId(2));
+    // Straight stretch of the +x cavity wall, y -10..10.
+    let ext = |a: [f64; 2], b: [f64; 2]| PluginInput::Points { points: vec![a, b] };
+    let r = ok(
+        &mut s,
+        feature(
+            "lip",
+            &[
+                ("face", face_in(end_cap(e))),
+                ("mate", face_in(SketchPlane::Face(start_cap(lid)))),
+                ("extents", ext([28.0, -10.0], [28.0, 10.0])),
+            ],
+            &[("width", 1.0), ("height", 2.0), ("clearance", 0.1)],
+            &[("type", "lip_and_groove")],
+        ),
+    );
+    assert_close(
+        vol(&s, BodyId(1)),
+        BOX + 20.0 * 1.0 * 2.0,
+        1e-6,
+        "partial lip",
+    );
+    // Groove: the band (−0.1, 1.1) across the same 20 mm stretch; only its
+    // part in the wall (0..1.1) has material, 2.1 deep.
+    assert_close(
+        vol(&s, BodyId(2)),
+        lid_v - 20.0 * 1.1 * 2.1,
+        1e-6,
+        "partial groove",
+    );
+    // Round the corner: (28, 10) to (20, 18), mitred: 8 + 8 + the 1 x 1 corner.
+    ok(
+        &mut s,
+        Command::DeleteFeature {
+            feature: r.feature.unwrap(),
+        },
+    );
+    ok(
+        &mut s,
+        feature(
+            "lip",
+            &[
+                ("face", face_in(end_cap(e))),
+                ("extents", ext([28.0, 10.0], [20.0, 18.0])),
+            ],
+            &[("width", 1.0), ("height", 2.0)],
+            &[],
+        ),
+    );
+    assert_close(vol(&s, BodyId(1)), BOX + 17.0 * 2.0, 1e-6, "corner lip");
+}
