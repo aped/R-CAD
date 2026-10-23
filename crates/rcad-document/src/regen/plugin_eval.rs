@@ -339,12 +339,20 @@ pub(super) fn eval_plugin(
         let t = brep_target(st, id, target)?;
         let removes = *mode == rp::Mode::Cut;
         // Outward side of a target face in the operation's plane (height
-        // 0), as for an extrusion sketched there.
-        let side = k::coplanar_face_side(&t, &frame).map_err(kernel(id))?;
+        // 0). A Join starting there is joined like an extrusion sketched on
+        // that face. A Cut's span is explicit (plugins overshoot into air
+        // themselves), so it gets no start face; its direction points into
+        // the material, so only its far end is moved off a coplanar face.
+        let plane_side = k::coplanar_face_side(&t, &frame).map_err(kernel(id))?;
+        let (side, dir) = if removes {
+            (None, plane_side.map_or(1.0, |s| -s))
+        } else {
+            (plane_side, 1.0)
+        };
         let tool = ExtrudeOut {
             start: frame,
             distance: to - from,
-            dir: 1.0,
+            dir,
             extent: Extent::Distance,
             profile: prof,
             // Synthetic entity ids: edge i of the normalised profile, so

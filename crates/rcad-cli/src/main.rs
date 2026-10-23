@@ -3,10 +3,12 @@
 //! ```text
 //! rcad-cli acceptance [--out DIR]     run the acceptance workflow with analytic checks
 //! rcad-cli run SCRIPT.json            execute a JSON array of commands, print JSON lines
+//! rcad-cli plugins [--json]           list the built-in and installed plugins
 //! rcad-cli [--json] cloud COMMAND ... optional sync server: login, push, save, pull, sync, ...
 //! ```
 //!
-//! `cloud` commands (see [`cloud`]) use the app's account file and cache; nothing touches the
+//! `run` and `plugins` load the external plugins installed in the plugin search directories
+//! (docs/PLUGINS.md) first. `cloud` commands (see [`cloud`]) use the app's account file and cache; nothing touches the
 //! network unless a `cloud` command is run.
 mod cloud;
 mod out;
@@ -33,7 +35,7 @@ fn yes() -> bool {
 
 fn usage() -> ExitCode {
     esay!(
-        "usage:\n  rcad-cli acceptance [--out DIR]\n  rcad-cli run SCRIPT.json\n  rcad-cli cloud COMMAND (rcad-cli cloud help)\n  rcad-cli --version"
+        "usage:\n  rcad-cli acceptance [--out DIR]\n  rcad-cli run SCRIPT.json\n  rcad-cli plugins [--json]\n  rcad-cli cloud COMMAND (rcad-cli cloud help)\n  rcad-cli --version"
     );
     ExitCode::from(64)
 }
@@ -67,11 +69,61 @@ fn main() -> ExitCode {
             None => usage(),
         },
         Some("run") => match args.get(1) {
-            Some(p) => run_script(PathBuf::from(p)),
+            Some(p) => {
+                load_plugins();
+                run_script(PathBuf::from(p))
+            }
             None => usage(),
+        },
+        Some("plugins") => match args.get(1).map(String::as_str) {
+            None => list_plugins(false),
+            Some("--json") => list_plugins(true),
+            Some(_) => usage(),
         },
         _ => usage(),
     }
+}
+
+/// Register the built-in plugins and load the installed external ones,
+/// reporting load errors on stderr (a broken plugin never stops a run).
+fn load_plugins() {
+    rcad_commands::plugins::register_builtin();
+    let (_, errs) = rcad_commands::plugins::load_installed();
+    for e in errs {
+        esay!("plugin not loaded: {e}");
+    }
+}
+
+fn list_plugins(json: bool) -> ExitCode {
+    load_plugins();
+    let list = rcad_commands::plugins::list();
+    if json {
+        match serde_json::to_string_pretty(&list) {
+            Ok(j) => say!("{j}"),
+            Err(e) => {
+                esay!("cannot serialize: {e}");
+                return ExitCode::from(2);
+            }
+        }
+        return ExitCode::SUCCESS;
+    }
+    for p in &list {
+        let m = &p.manifest;
+        say!(
+            "{} {} ({}){}",
+            m.id,
+            m.version,
+            m.name,
+            if p.builtin { ", built in" } else { "" }
+        );
+        for f in &m.features {
+            say!("  feature  {:<12} {}", f.id, f.name);
+        }
+        for a in &m.analyses {
+            say!("  analysis {:<12} {}", a.id, a.name);
+        }
+    }
+    ExitCode::SUCCESS
 }
 
 /// Index of the `cloud` word after leading `cloud` options (`--json`, `--account URL`).

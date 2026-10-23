@@ -32,6 +32,7 @@ mod exchange_qualification;
 mod export_determinism;
 mod expression_and_hole_regressions;
 mod external_component;
+mod external_plugin;
 mod extrude_options;
 mod face_ref_of;
 mod fillet_loop;
