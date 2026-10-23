@@ -571,3 +571,82 @@ pub fn run_analysis(m: &Model, c: &PluginAnalysisCmd) -> Result<serde_json::Valu
     };
     p.analyze(&req).map_err(plugin_err)
 }
+
+/// `bind_rule_parameters`: bind the slots of core feature `feature` that a
+/// plugin's rules drive (e.g. a Shell's thickness to `ABS_T`) to the rule of
+/// the feature's body, in one undo step. Slots already bound to an
+/// expression are kept; `plugin` limits it to one plugin. The message names
+/// the bindings made.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BindRulesCmd {
+    pub feature: FeatureId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plugin: Option<String>,
+}
+
+/// Core feature kind names for [`rp::Plugin::core_rule_templates`].
+fn core_kind(k: &FeatureKind) -> Option<&'static str> {
+    Some(match k {
+        FeatureKind::Shell { .. } => "shell",
+        FeatureKind::ShellFace { .. } => "shell_face",
+        FeatureKind::Fillet { .. } => "fillet",
+        FeatureKind::FilletLoop { .. } => "fillet_loop",
+        FeatureKind::Extrude { .. } => "extrude",
+        FeatureKind::Thicken { .. } => "thicken",
+        _ => return None,
+    })
+}
+
+pub fn bind_rules(m: &mut Model, c: &BindRulesCmd) -> Result<String, DocError> {
+    let doc = m.document();
+    let f = doc.feature(c.feature)?;
+    let kind = core_kind(&f.kind).ok_or_else(|| {
+        DocError::Validation(format!(
+            "{} ({}) has no rule-driven parameters (shell, fillet, extrude taper/thin, thicken)",
+            c.feature, f.name
+        ))
+    })?;
+    let body = doc
+        .modified_body(f)
+        .or_else(|| f.created_bodies().first().copied());
+    let mut bind: BTreeMap<String, String> = BTreeMap::new();
+    for p in rp::plugins() {
+        if c.plugin.as_ref().is_some_and(|x| x != &p.manifest().id) {
+            continue;
+        }
+        let sym = rule_symbols(p.as_ref(), doc, &p.manifest().id, body);
+        if sym.is_empty() {
+            continue;
+        }
+        for (slot, t) in p.core_rule_templates(kind) {
+            if f.expressions.contains_key(&slot)
+                || rcad_document::params::slot_kind(&f.kind, &slot).is_none()
+            {
+                continue;
+            }
+            if let Some(e) = rp::expand_rule(&t, &sym) {
+                bind.entry(slot).or_insert(e);
+            }
+        }
+    }
+    if bind.is_empty() {
+        return Ok(format!(
+            "no rule applies to {} (no rule on its body, or no rule-driven slot left unbound)",
+            c.feature
+        ));
+    }
+    let id = c.feature;
+    let text = bind
+        .iter()
+        .map(|(k, v)| format!("{k} = {v}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    m.transact(&format!("Bind {id} to its rule"), |d| {
+        let f = d.feature_mut(id)?;
+        for (k, v) in &bind {
+            f.expressions.insert(k.clone(), v.clone());
+        }
+        Ok(())
+    })?;
+    Ok(format!("{id}: {text}"))
+}

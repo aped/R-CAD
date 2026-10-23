@@ -1098,6 +1098,9 @@ pub enum Command {
     SetPluginData(plugins::SetPluginDataCmd),
     /// Run a read-only plugin analysis (`Response::plugin_report`).
     RunPluginAnalysis(plugins::PluginAnalysisCmd),
+    /// Bind a core feature's rule-driven slots (shell thickness, fillet
+    /// radius, ...) to its body's plugin rule (`plugins::BindRulesCmd`).
+    BindRuleParameters(plugins::BindRulesCmd),
     /// Replace the definition of feature `feature` (Edit Feature): same id
     /// and history position, one undoable step. `kind` must be the same
     /// feature type; a body id 0 in a New Body operation means "the body the
@@ -1440,6 +1443,7 @@ impl Command {
             Command::PluginFeature(_) => "plugin_feature",
             Command::SetPluginData(_) => "set_plugin_data",
             Command::RunPluginAnalysis(_) => "run_plugin_analysis",
+            Command::BindRuleParameters(_) => "bind_rule_parameters",
             Command::SketchOp { .. } => "sketch_op",
             Command::Close => "close",
             Command::SaveCopy { .. } => "save_copy",
@@ -4345,6 +4349,10 @@ impl Session {
             }
             Command::SetPluginData(c) => {
                 r.message = Some(plugins::set_data(self.model_mut()?, c)?);
+            }
+            Command::BindRuleParameters(c) => {
+                r.feature = Some(c.feature);
+                r.message = Some(plugins::bind_rules(self.model_mut()?, c)?);
             }
             Command::RunPluginAnalysis(c) => {
                 let m = self

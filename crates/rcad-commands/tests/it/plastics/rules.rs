@@ -433,3 +433,51 @@ fn rules_assigned_to_a_component_reach_its_bodies() {
         .unwrap();
     assert_eq!(b.material.and_then(|m| m.catalog).as_deref(), Some("abs"));
 }
+
+#[test]
+fn core_shells_bind_to_the_rule_thickness() {
+    let mut s = Session::new();
+    ok(&mut s, Command::NewDocument);
+    let e = plate(&mut s, SketchPlane::WorldXY, 60.0, 40.0, 20.0);
+    ok(&mut s, rules("2 mm"));
+    let sh = ok(
+        &mut s,
+        Command::ShellFace {
+            name: None,
+            face: FaceRef {
+                feature: e,
+                role: FaceRole::ExtrudeEndCap,
+            },
+            thickness: 3.0,
+        },
+    )
+    .feature
+    .unwrap();
+    let shell = |t: f64| 60.0 * 40.0 * 20.0 - (60.0 - 2.0 * t) * (40.0 - 2.0 * t) * (20.0 - t);
+    assert_close(vol(&s, BodyId(1)), shell(3.0), 1e-9, "plain shell");
+    let r = ok(
+        &mut s,
+        Command::BindRuleParameters(rcad_commands::plugins::BindRulesCmd {
+            feature: sh,
+            plugin: None,
+        }),
+    );
+    assert!(r.message.unwrap().contains("thickness = ABS_T"));
+    assert_close(vol(&s, BodyId(1)), shell(2.0), 1e-9, "shell at ABS_T");
+    ok(&mut s, rules("2.5 mm"));
+    assert_close(
+        vol(&s, BodyId(1)),
+        shell(2.5),
+        1e-9,
+        "shell follows the rule",
+    );
+    // A kind without rule-driven slots is refused by name.
+    let m = err(
+        &mut s,
+        Command::BindRuleParameters(rcad_commands::plugins::BindRulesCmd {
+            feature: FeatureId(1),
+            plugin: None,
+        }),
+    );
+    assert!(m.contains("no rule-driven parameters"), "{m}");
+}

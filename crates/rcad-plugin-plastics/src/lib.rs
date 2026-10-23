@@ -146,6 +146,20 @@ impl Plugin for Plastics {
             .unwrap_or_default()
     }
 
+    fn core_rule_templates(&self, kind: &str) -> BTreeMap<String, String> {
+        let t: &[(&str, &str)] = match kind {
+            // Wall thickness, nominal radius, draft (docs/PLASTICS.md).
+            "shell" | "shell_face" => &[("thickness", "T")],
+            "fillet" | "fillet_loop" => &[("radius", "NR")],
+            "extrude" => &[("taper_deg", "DA"), ("thin", "T")],
+            "thicken" => &[("distance", "T")],
+            _ => &[],
+        };
+        t.iter()
+            .map(|(a, b)| (a.to_string(), b.to_string()))
+            .collect()
+    }
+
     fn rule_symbols_in(
         &self,
         data: &serde_json::Value,
