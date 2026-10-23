@@ -284,16 +284,17 @@ class Features(unittest.TestCase):
         line = sk.sketchCurves.sketchLines.addByTwoPoints(P.create(0, 0.5, 0), P.create(2, 0.5, 0))
         ri = root.features.ribFeatures.createInput([line], V.createByReal(0.1), body)
         ri.isFlipped = True
-        with self.assertRaisesRegex(adsk.NotSupported, "RibFeatureInput.setToNextExtent"):
-            ri.setToNextExtent()
-        ri.setDistanceExtent(V.createByReal(0.4))
+        ri.setToNextExtent()
+        ri.setDistanceExtent(V.createByReal(0.4))  # the last extent set wins
         root.features.ribFeatures.add(ri)
         wi = root.features.webFeatures.createInput(sk, V.createByString("1 mm"), body)
         wi.setToNextExtent()
         root.features.webFeatures.add(wi)
         rib, web = [c for c in commands() if c["cmd"] == "plugin_feature"]
         self.assertEqual(rib["feature"], "rib")
-        self.assertEqual(rib["choices"], {"side": "left", "thickness_side": "symmetric"})
+        self.assertEqual(
+            rib["choices"], {"side": "left", "thickness_side": "symmetric", "extent": "distance"}
+        )
         self.assertEqual(rib["params"], {"thickness": 1.0, "depth": 4.0})
         self.assertEqual(rib["inputs"]["body"], {"kind": "body", "body": 1})
         self.assertEqual(web["choices"]["extent"], "to_next")

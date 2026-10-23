@@ -1651,11 +1651,6 @@ class RibFeatureInput(Base):
         return True
 
     def setToNextExtent(self):
-        if not self._web:
-            raise NotSupported(
-                "adsk.fusion.RibFeatureInput.setToNextExtent is not in R-CAD's Fusion API subset "
-                "(R-CAD ribs take a distance)"
-            )
         self._to_next = True
         self._depth = None
         return True
@@ -1673,7 +1668,7 @@ class RibFeatures(Collection):
         else:
             items = _items(curves, "%sFeatures.createInput" % kind)
         if not items or not all(isinstance(c, SketchLine) for c in items):
-            raise NotSupported("%s curves: only sketch lines are supported" % kind)
+            raise NotSupported("%s curves: only sketch lines are supported by this subset" % kind)
         if len(set(id(c._sketch) for c in items)) != 1:
             raise NotSupported("%s curves: all curves must be in one sketch" % kind)
         if targetBody is not None and not isinstance(targetBody, BRepBody):
@@ -1687,7 +1682,7 @@ class RibFeatures(Collection):
             raise NotSupported("%sFeatures.add needs an input from its own createInput" % kind)
         sketch = input._curves[0]._sketch
         if not input._to_next and input._depth is None:
-            raise NotSupported("%s: set an extent (setDistanceExtent%s)" % (kind, ", setToNextExtent" if self._web else ""))
+            raise NotSupported("%s: set an extent (setDistanceExtent, setToNextExtent)" % kind)
         params, exprs, choices = {}, {}, {}
         for slot, vi, k in (
             ("thickness", input._thickness, LENGTH),
@@ -1707,6 +1702,7 @@ class RibFeatures(Collection):
         else:
             # Default: tangent x normal (R-CAD "right"); flipped: "left".
             choices["side"] = "left" if input._flipped else "right"
+            choices["extent"] = "to_next" if input._to_next else "distance"
         all_lines = [c for k, c in sketch._entities if c._id not in sketch._construction]
         if set(id(c) for c in input._curves) == set(id(c) for c in all_lines):
             sid = sketch._use(kind)

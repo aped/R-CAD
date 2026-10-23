@@ -123,7 +123,7 @@ exist on every object; collections have `count`, `item(i)` and iteration.
 | `.tipRadius` | `tip_radius` (fillet of the shank top) |
 | `.alignmentType` (`BossAlignFlat`, `BossAlignStepOut`, `BossAlignStepIn`), `.alignmentDiameter`, `.alignmentDepth` | `step` (none/out/in), `step_diameter`, `step_depth` |
 | `.rootRadius`, `.holeStartRadius`, `.holeEndRadius`, `.ribRootRadius`, `.ribTipRadius`, `.ribDraftAngle`, `.ribOuterDraftAngle` | accepted only as 0 (not modelled) |
-| `ribFeatures.createInput(curves, thickness, targetBody)`, `RibFeatureInput.setDistanceExtent(depth)`, `.thickness`, `.draftAngle`, `.isFlipped`, `.isSymmetric`, `.targetBody`; `ribFeatures.add` | `plugin_feature` `rib`: `thickness`, `depth`, `draft_deg`; side `right` (the curve direction × the sketch normal) or `left` when flipped; `thickness_side` `symmetric` / `one_side` |
+| `ribFeatures.createInput(curves, thickness, targetBody)`, `RibFeatureInput.setDistanceExtent(depth)`, `.setToNextExtent()`, `.thickness`, `.draftAngle`, `.isFlipped`, `.isSymmetric`, `.targetBody`; `ribFeatures.add` | `plugin_feature` `rib`: `thickness`, `depth`, `draft_deg`; side `right` (the curve direction × the sketch normal) or `left` when flipped; `thickness_side` `symmetric` / `one_side`; `extent` `distance` / `to_next` |
 | `webFeatures.createInput(curves, thickness, targetBody)`, `WebFeatureInput.setDistanceExtent(depth)`, `.setToNextExtent()`, `.thickness`, `.draftAngle`, `.isFlipped`, `.isSymmetric`, `.targetBody`; `webFeatures.add` | `plugin_feature` `web`: as the rib, with `direction` `normal` / `flip` and `extent` `distance` / `to_next` |
 
 `curves` is a list or `ObjectCollection` of sketch lines from one sketch, or a `Sketch` (all of
@@ -177,7 +177,7 @@ was stored keep their plain values.
   counterbores and countersinks on side 1, fillet-shaped ribs, `setRibExtent`, rib cut size and
   chamfer angle, and `isDefaultDirection = False`. The boss offset is a plain value (not bound to
   a parameter).
-- **Rib and web:** ribs take a distance (no to-next). `isThicknessFromTop`, `isExtended` (extend
+- **Rib and web:** ribs and webs take a distance or to-next. `isThicknessFromTop`, `isExtended` (extend
   curves), fillet radii other than 0 and `draftPullDirection` are not mapped. Only straight
   lines are accepted.
 - **Plastic rules:** `thicknessVariation` is not mapped: R-CAD's `TV` is a ratio. Library rules
