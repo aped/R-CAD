@@ -21,6 +21,8 @@ rcad-exchange = { path = "crates/rcad-exchange", version = "1.0.0" }
 rcad-kernel = { path = "crates/rcad-kernel", version = "1.0.0" }
 rcad-sketch = { path = "crates/rcad-sketch", version = "1.0.0" }
 rcad-viewport = { path = "crates/rcad-viewport", version = "1.0.0" }
+rcad-plugin = { path = "crates/rcad-plugin", version = "1.0.0" }
+rcad-plugin-plastics = { path = "crates/rcad-plugin-plastics", version = "1.0.0" }
 eframe = { version = "0.36.2", default-features = false, features = ["default_fonts", "wayland", "x11", "wgpu"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"

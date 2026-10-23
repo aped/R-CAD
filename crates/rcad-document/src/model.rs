@@ -2,6 +2,7 @@
 use crate::{DocError, Result};
 use rcad_sketch::Sketch;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::fmt;
 
 /// Stable feature identifier. Allocated monotonically, never reused.
@@ -143,6 +144,11 @@ pub enum FaceRole {
     },
     /// The planar face made by a Chamfer feature.
     Chamfer,
+    /// Face of operation `op` (the plugin's stable operation id) of a
+    /// plugin feature ([`FeatureKind::Plugin`], format v10), with the same
+    /// meaning as the extrusion roles on that operation's tool. An operation
+    /// the plugin no longer emits is a `BrokenReference`.
+    Plugin { op: u32, of: CopiedRole },
 }
 
 /// Role of a seed tool's face within a pattern/mirror occurrence
@@ -755,6 +761,26 @@ pub enum FeatureKind {
         reverse: bool,
         body: BodyId,
     },
+    /// Plugin feature (format v10; docs/PLUGINS.md): feature type `feature`
+    /// of plugin `plugin`, with its inputs as persistent references, its
+    /// numeric parameters (expression-bindable slots, kind stored so the
+    /// slots work while the plugin is not installed) and its choices. On
+    /// regeneration the inputs are resolved and the plugin builds operations
+    /// that are applied through the checked tool path; a plugin that is not
+    /// installed fails the feature with a clear error and keeps its data.
+    Plugin {
+        plugin: String,
+        feature: String,
+        /// Version of the plugin that created or last edited the feature.
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        plugin_version: String,
+        #[serde(default)]
+        inputs: BTreeMap<String, PluginInput>,
+        #[serde(default)]
+        params: BTreeMap<String, PluginParam>,
+        #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+        choices: BTreeMap<String, String>,
+    },
     /// Thicken (format v7) the single planar or cylindrical face of
     /// surface body `source` by `distance` mm along its normal (`reverse`:
     /// against it) into new solid body `body`. Parameter "distance".
@@ -765,6 +791,39 @@ pub enum FeatureKind {
         reverse: bool,
         body: BodyId,
     },
+}
+
+/// Input of a [`FeatureKind::Plugin`] feature: a persistent reference,
+/// resolved on every regeneration (never a face index).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum PluginInput {
+    /// A plane holding a planar face of a body (a face, or a construction
+    /// plane offset from one).
+    Face {
+        plane: SketchPlane,
+    },
+    Faces {
+        faces: Vec<FaceRef>,
+    },
+    Body {
+        body: BodyId,
+    },
+    Sketch {
+        sketch: FeatureId,
+    },
+    /// Points in the plane of the feature's Face input (mm).
+    Points {
+        points: Vec<[f64; 2]>,
+    },
+}
+
+/// Numeric parameter of a [`FeatureKind::Plugin`] feature: value in the
+/// kind's display unit (mm, degrees, count, ratio).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct PluginParam {
+    pub value: f64,
+    pub kind: rcad_plugin::ParamKind,
 }
 
 /// Nut of a [`FeatureKind::Thread`]: square `width`, radial `clearance` (mm).
@@ -1110,6 +1169,21 @@ impl Feature {
             FeatureKind::ImportStep { .. }
             | FeatureKind::ImportMesh { .. }
             | FeatureKind::Import3mf { .. } => vec![],
+            // Body inputs' creators come from `Document::dependencies_of`.
+            FeatureKind::Plugin { inputs, .. } => {
+                let mut v = Vec::new();
+                for i in inputs.values() {
+                    match i {
+                        PluginInput::Face { plane } => v.extend(plane.face().map(|r| r.feature)),
+                        PluginInput::Faces { faces } => v.extend(faces.iter().map(|r| r.feature)),
+                        PluginInput::Sketch { sketch } => v.push(*sketch),
+                        PluginInput::Body { .. } | PluginInput::Points { .. } => {}
+                    }
+                }
+                v.sort();
+                v.dedup();
+                v
+            }
         }
     }
 
@@ -1218,6 +1292,13 @@ impl Feature {
             | FeatureKind::Thicken { source, .. }
             | FeatureKind::MeshRepair { source, .. }
             | FeatureKind::MeshEdit { source, .. } => vec![*source],
+            FeatureKind::Plugin { inputs, .. } => inputs
+                .values()
+                .filter_map(|i| match i {
+                    PluginInput::Body { body } => Some(*body),
+                    _ => None,
+                })
+                .collect(),
             _ => vec![],
         }
     }
@@ -1388,6 +1469,9 @@ impl Feature {
                 vec![("distance".into(), *distance)]
             }
             FeatureKind::SurfacePatch { .. } => vec![],
+            FeatureKind::Plugin { params, .. } => {
+                params.iter().map(|(n, p)| (n.clone(), p.value)).collect()
+            }
             FeatureKind::MeshRepair { options, .. } => {
                 vec![("weld_tolerance".into(), options.weld_tolerance)]
             }
@@ -1850,6 +1934,17 @@ impl Feature {
                 *tolerance = value;
                 Ok(())
             }
+            // Ranges are the plugin's (checked when the feature is built).
+            FeatureKind::Plugin { params, .. } if params.contains_key(name) => {
+                let p = params.get_mut(name).expect("checked");
+                if p.kind == rcad_plugin::ParamKind::Count && value.fract() != 0.0 {
+                    return Err(DocError::Validation(format!(
+                        "{id}.{name}: must be a whole number, got {value}"
+                    )));
+                }
+                p.value = value;
+                Ok(())
+            }
             FeatureKind::Thicken { distance, .. }
             | FeatureKind::SurfaceExtrude { distance, .. }
                 if name == "distance" =>
@@ -2205,6 +2300,11 @@ pub struct Document {
     /// shown and how bare numbers typed by the user are read.
     #[serde(default, skip_serializing_if = "DocumentUnits::is_default")]
     pub units: DocumentUnits,
+    /// Plugin-owned document data by plugin id (format v10; e.g. the
+    /// plastic rules and their body assignments), validated by the plugin
+    /// before it is stored and kept as-is while the plugin is not installed.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub plugin_data: BTreeMap<String, serde_json::Value>,
 }
 
 /// Display length unit of a document ([`Document::units`]).
@@ -2283,6 +2383,7 @@ impl Document {
             assembly: Default::default(),
             drawings: Vec::new(),
             units: DocumentUnits::Mm,
+            plugin_data: BTreeMap::new(),
         }
     }
 
@@ -2551,6 +2652,19 @@ impl Document {
             | FeatureKind::ChamferLoop { face: a, .. } => self.face_body(a),
             FeatureKind::ShellFace { face, .. } | FeatureKind::AlignBody { from: face, .. } => {
                 self.face_body(face)
+            }
+            FeatureKind::Plugin { inputs, .. } => {
+                // The placement face's body, else the first body input.
+                let face = inputs.values().find_map(|i| match i {
+                    PluginInput::Face { plane } => plane.face(),
+                    _ => None,
+                });
+                face.and_then(|r| self.face_body(&r)).or_else(|| {
+                    inputs.values().find_map(|i| match i {
+                        PluginInput::Body { body } => Some(*body),
+                        _ => None,
+                    })
+                })
             }
             FeatureKind::Shell { extrude, .. } => self
                 .feature(*extrude)

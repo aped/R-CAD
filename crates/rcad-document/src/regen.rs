@@ -14,6 +14,8 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
 
+mod plugin_eval;
+
 /// How a semantic face reference resolved in this evaluation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ResolvedFace {
@@ -435,6 +437,9 @@ struct Snapshot {
     copies: HashMap<FeatureId, Vec<(u32, u32, ExtrudeOut)>>,
     /// Chamfer features: the chamfer face's frame (outward normal) and body.
     chamfers: HashMap<FeatureId, (Frame, BodyId)>,
+    /// Plugin features: each operation's tool by operation id, for
+    /// [`FaceRole::Plugin`].
+    plugin_tools: HashMap<FeatureId, Vec<(u32, ExtrudeOut)>>,
     imported_faces: HashMap<(FeatureId, BodyId), Arc<Vec<ImportedPlanarFace>>>,
     /// Imported faces whose plane no longer matches their stored print
     /// ([`crate::Feature::face_prints`]): (import, body, face) -> why.
@@ -492,6 +497,7 @@ impl Snapshot {
             holes: HashMap::new(),
             copies: HashMap::new(),
             chamfers: HashMap::new(),
+            plugin_tools: HashMap::new(),
             imported_faces: HashMap::new(),
             import_moved: HashMap::new(),
             import_planes: BTreeMap::new(),
@@ -2027,6 +2033,14 @@ fn eval_feature(
             st.moves.push((*body, i, t));
             r.body = Some(*body);
         }
+        FeatureKind::Plugin {
+            plugin,
+            feature,
+            inputs,
+            params,
+            choices,
+            ..
+        } => plugin_eval::eval_plugin(doc, id, plugin, feature, inputs, params, choices, st, r)?,
         FeatureKind::ShellFace { face, thickness } => {
             let rf = resolve_face(id, face, st)?;
             r.frame = Some(rf.frame);
@@ -2368,6 +2382,23 @@ fn face_candidates(st: &Snapshot, order: &[FeatureId]) -> Vec<FaceCandidate> {
                 feature: *fid,
                 role: FaceRole::Chamfer,
             });
+        }
+        if let Some(tools) = st.plugin_tools.get(fid) {
+            for (op, e) in tools {
+                let roles = [CopiedRole::EndCap, CopiedRole::StartCap]
+                    .into_iter()
+                    .chain(
+                        side_roles(e)
+                            .into_iter()
+                            .map(|entity| CopiedRole::Side { entity }),
+                    );
+                for of in roles {
+                    push(FaceRef {
+                        feature: *fid,
+                        role: FaceRole::Plugin { op: *op, of },
+                    });
+                }
+            }
         }
         let mut imported: Vec<_> = st
             .imported_faces
@@ -4987,10 +5018,12 @@ fn extrude_face_frame(e: &ExtrudeOut, fr: &FaceRef, from: FeatureId) -> Result<F
             "{} is an extrusion, not an import",
             fr.feature
         ))),
-        FaceRole::Copy { .. } | FaceRole::Chamfer => Err(broken(format!(
-            "{} is an extrusion, not a pattern, mirror or chamfer",
-            fr.feature
-        ))),
+        FaceRole::Copy { .. } | FaceRole::Chamfer | FaceRole::Plugin { .. } => {
+            Err(broken(format!(
+                "{} is an extrusion, not a pattern, mirror or chamfer",
+                fr.feature
+            )))
+        }
     }
 }
 
@@ -6276,6 +6309,16 @@ fn resolve_face(from: FeatureId, fr: &FaceRef, st: &Snapshot) -> Result<Resolved
         }
         FaceRole::Copy { instance, tool, of } => {
             let e = copy_occurrence(st, from, fr.feature, instance, tool)?;
+            let role = FaceRef {
+                feature: fr.feature,
+                role: of.extrude_role(),
+            };
+            let out = (extrude_face_frame(e, &role, from)?, e.body);
+            tool_of = Some((e, role.role));
+            out
+        }
+        FaceRole::Plugin { op, of } => {
+            let e = plugin_eval::plugin_tool(st, from, fr.feature, op)?;
             let role = FaceRef {
                 feature: fr.feature,
                 role: of.extrude_role(),

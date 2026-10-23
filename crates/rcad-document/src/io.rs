@@ -40,7 +40,9 @@ pub const FORMAT_NAME: &str = "r-cad";
 /// concentric/collinear/symmetric sketch constraints, expressions on
 /// sheet-metal rules and flanges, regions of crossing sketch curves).
 /// Written only when used.
-pub const FORMAT_VERSION: u32 = 9;
+/// v10: plugin features, faces of plugin features and plugin document data
+/// ([`v10_feature`]; docs/PLUGINS.md). Written only when used.
+pub const FORMAT_VERSION: u32 = 10;
 /// Oldest version this build reads.
 pub const MIN_FORMAT_VERSION: u32 = 1;
 /// Refuse to parse native files larger than this (v3 embeds imported source files).
@@ -515,8 +517,34 @@ pub fn sketch_v6_feature(doc: &Document) -> Option<&'static str> {
 
 /// The oldest format version that can hold `doc`: 8 / 7 / 6 / 5 when it uses a
 /// v8 / v7 / v6 / v5 feature, else 4.
+/// What in `doc` needs format v10, if anything (see [`FORMAT_VERSION`]).
+pub fn v10_feature(doc: &Document) -> Option<&'static str> {
+    if !doc.plugin_data.is_empty() {
+        return Some("plugin document data");
+    }
+    if doc
+        .features
+        .iter()
+        .any(|f| matches!(f.kind, crate::FeatureKind::Plugin { .. }))
+    {
+        return Some("plugin features");
+    }
+    // Faces of plugin features referenced by other features (a v9 reader
+    // cannot parse the role).
+    if doc
+        .features
+        .iter()
+        .any(|f| serde_json::to_string(&f.kind).is_ok_and(|t| t.contains("\"Plugin\":{\"op\"")))
+    {
+        return Some("references to faces of plugin features");
+    }
+    None
+}
+
 pub fn required_version(doc: &Document) -> u32 {
-    if v9_feature(doc).is_some() {
+    if v10_feature(doc).is_some() {
+        10
+    } else if v9_feature(doc).is_some() {
         9
     } else if v8_feature(doc).is_some() {
         8

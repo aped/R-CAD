@@ -692,6 +692,12 @@ pub fn slot_kind(kind: &FeatureKind, name: &str) -> Option<SlotKind> {
         }
         FeatureKind::Extrude { .. } => kind_has(kind, name).then_some(SlotKind::Length),
         FeatureKind::Pocket { .. } if name == "depth" => Some(SlotKind::Length),
+        FeatureKind::Plugin { params, .. } => params.get(name).map(|p| match p.kind {
+            rcad_plugin::ParamKind::Length => SlotKind::Length,
+            rcad_plugin::ParamKind::Angle => SlotKind::Angle,
+            rcad_plugin::ParamKind::Count => SlotKind::Count,
+            rcad_plugin::ParamKind::Ratio => SlotKind::Ratio,
+        }),
         FeatureKind::Shell { .. } | FeatureKind::ShellFace { .. } if name == "thickness" => {
             Some(SlotKind::Length)
         }

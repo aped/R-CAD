@@ -2571,6 +2571,7 @@ dependencies = [
  "rcad-cancel",
  "rcad-exchange",
  "rcad-kernel",
+ "rcad-plugin",
  "rcad-sketch",
  "serde",
  "serde_json",
@@ -2606,6 +2607,26 @@ dependencies = [
  "truck-shapeops",
  "truck-stepio",
  "truck-topology",
+]
+
+[[package]]
+name = "rcad-plugin"
+version = "1.0.0"
+dependencies = [
+ "rcad-sketch",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "rcad-plugin-plastics"
+version = "1.0.0"
+dependencies = [
+ "rcad-plugin",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

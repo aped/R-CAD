@@ -12,6 +12,7 @@ description = "Feature history, parameters, regeneration, undo and the native fo
 [dependencies]
 rcad-cancel.workspace = true
 rcad-kernel.workspace = true
+rcad-plugin.workspace = true
 rcad-sketch.workspace = true
 rcad-exchange.workspace = true
 serde.workspace = true
