@@ -83,7 +83,7 @@ sketch and facing it.
 - hole: `hole_diameter` (2.5, at the top), `hole_depth` (6, from the top), `hole_draft_deg`
   (0);
 - ribs: `rib_count` (0–12), `rib_thickness` (1.2, *rule* `0.6*T`), `rib_length` (6, from the
-  axis), `rib_height` (6), `rib_tip_height` (2), `rib_angle_deg` (0), `rib_total_deg` (360);
+  axis), `rib_height` (6), `rib_chamfer` (3), `rib_tip_height` (2), `rib_angle_deg` (0), `rib_total_deg` (360);
 - mating boss: `mate_diameter` (6), `mate_hole_diameter` (3.4), `cbore_diameter` (6),
   `cbore_depth` (0: none), `gap` (*rule* `CL`).
 
@@ -92,8 +92,11 @@ sketch and facing it.
 **Result.** Per point:
 - a drafted shank from the base face (the nearest face at or below the sketch plane facing it)
   up `height`;
-- gusset ribs, a section from the axis to `rib_length`, `rib_height` high at the shank sloping
-  to `rib_tip_height`, spread evenly over the total angle;
+- gusset ribs, a section from the axis to `rib_length` with a flat top at `rib_height`,
+  chamfered over the last `rib_chamfer` down to `rib_tip_height` (Fusion's chamfer profile),
+  spread evenly over the total angle. The chamfer must start outside the shank: the flat top
+  then meets the shank in circle arcs and the gusset sides in straight lines, all exact edges, so
+  the body exports to STEP;
 - the hole, cut last.
 
 With `mate`, the other body also gets:
@@ -292,6 +295,11 @@ closed forms to 1e-6 relative, with point probes:
 - references to boss faces that follow edits, and broken references;
 - redefinition and undo;
 - save and reload at v10, and a missing plugin.
+
+**Independent validation:** `tools/check_plastics.sh` exports bosses with gussets, a drafted
+rest, a lip and groove, a snap-fit groove and the enclosure example to STEP. FreeCAD
+(OpenCascade) reads each body as one valid solid; volumes agree with the closed forms within
+2e-9 relative, and with R-CAD's own for the enclosure.
 
 **Unit tests:**
 - `crates/rcad-plugin-plastics/tests/advice.rs`: analytic meshes for thickness, draft (exact
