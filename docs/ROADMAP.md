@@ -35,8 +35,8 @@ value per effort. Autodesk Fusion is the behavioural reference where behaviour i
 - More plugin operations (revolve, fillets of an operation's edges, new bodies, sweeps along
   edge chains), so plastics features gain root fillets, curved ribs and swept lips
   (docs/PLASTICS.md lists today's deviations); rule assignment per component.
-- A compatibility layer for scripts written against Fusion's add-in API, on top of the plugin
-  interface (ADR 0016).
+- More of Fusion's add-in API in the script compatibility layer (docs/FUSION_SCRIPTS.md lists
+  what is mapped): boss side 2, symmetric/taper extrudes, edge fillets, command/UI events.
 
 ## Interchange
 - STEP: colours round trip (names of solids are kept), AP242 export (today AP214), solids and

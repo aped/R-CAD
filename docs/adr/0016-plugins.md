@@ -121,7 +121,7 @@ The invariants that must hold for plugins as for core features:
 - External plugins run user-installed programs, as Fusion add-ins do. The host contains their
   failures, but it does not sandbox what they can read or write. That is the installer's trust
   decision, stated in docs/PLUGINS.md.
-- Fusion add-in scripts (Python against the `adsk` API) do not run here. Their concepts
-  (manifest, declared command inputs, custom features as one timeline node with parameters) map
-  onto this model. An `adsk` compatibility layer would sit on top of this interface, not replace
-  it.
+- Fusion add-in scripts: a documented subset of the Python `adsk` API, including the plastics
+  objects, runs through `rcad-cli fusion-script` (docs/FUSION_SCRIPTS.md). It records calls as
+  commands on top of this interface, not as a second one. Add-in UI events and C++ add-ins are out
+  of scope.

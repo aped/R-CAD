@@ -217,5 +217,8 @@ against closed-form volumes, a parameter edit, a plugin refusal, then save and r
 | custom feature (one timeline node, own parameters, built from native features) | `FeatureKind::Plugin`: one history item, parameters as slots, built from checked operations |
 | model parameters created by plastic rules | user parameters from `data_effects` |
 
-Fusion's Python/C++ `adsk` API scripts do not run in R-CAD. They would need a compatibility layer
-on top of this interface.
+Fusion scripts written in Python against a documented subset of the add-in API (sketches,
+extrudes, shell, fillets, user parameters, and the plastics API objects Boss, Rib, Web and plastic
+rules) run with `rcad-cli fusion-script SCRIPT.py`. That compatibility layer
+(`compat/fusion/adsk`, docs/FUSION_SCRIPTS.md) records the script's calls as R-CAD commands. API
+members outside the subset fail by name; it does not run C++ add-ins or Fusion's UI events.
