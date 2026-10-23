@@ -35,6 +35,14 @@ which format versions a build reads and writes is listed in
 
   See `docs/PLASTICS.md`.
 - Material catalog: PC, PC/ABS, PP, PA66, POM, HDPE.
+- **Fusion-style scripts.** `rcad-cli fusion-script SCRIPT.py [--out DOC] [--commands OUT.json]`
+  runs Python scripts written for a subset of the Fusion add-in API surface: sketches on
+  construction planes and faces, extrude, shell, fillet, user parameters, and the boss, rib,
+  web and plastic rule objects. A pure-Python `adsk` package (`compat/fusion/adsk`, an
+  independent implementation from the public API reference) records the calls as R-CAD
+  commands, converting from centimetres and radians and binding parameter expressions. The
+  CLI then executes them like `run`. Members outside the subset fail by name. See
+  `docs/FUSION_SCRIPTS.md` and the examples in `compat/fusion/examples`.
 
 - **Optional sync server client.** R-CAD stays complete offline with no account; adding an
   account for a self-hosted server (protocol in `crates/rcad-cloud-proto`, documented routes,

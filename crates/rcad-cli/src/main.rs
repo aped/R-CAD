@@ -3,14 +3,17 @@
 //! ```text
 //! rcad-cli acceptance [--out DIR]     run the acceptance workflow with analytic checks
 //! rcad-cli run SCRIPT.json            execute a JSON array of commands, print JSON lines
+//! rcad-cli fusion-script SCRIPT.py    run a script for a subset of the Fusion add-in API
+//!          [--out DOC] [--commands OUT.json]   (docs/FUSION_SCRIPTS.md), print JSON lines
 //! rcad-cli plugins [--json]           list the built-in and installed plugins
 //! rcad-cli [--json] cloud COMMAND ... optional sync server: login, push, save, pull, sync, ...
 //! ```
 //!
-//! `run` and `plugins` load the external plugins installed in the plugin search directories
+//! `run`, `fusion-script` and `plugins` load the external plugins installed in the plugin search directories
 //! (docs/PLUGINS.md) first. `cloud` commands (see [`cloud`]) use the app's account file and cache; nothing touches the
 //! network unless a `cloud` command is run.
 mod cloud;
+mod fusion;
 mod out;
 
 use out::{esay, say};
@@ -35,7 +38,7 @@ fn yes() -> bool {
 
 fn usage() -> ExitCode {
     esay!(
-        "usage:\n  rcad-cli acceptance [--out DIR]\n  rcad-cli run SCRIPT.json\n  rcad-cli plugins [--json]\n  rcad-cli cloud COMMAND (rcad-cli cloud help)\n  rcad-cli --version"
+        "usage:\n  rcad-cli acceptance [--out DIR]\n  rcad-cli run SCRIPT.json\n  rcad-cli fusion-script SCRIPT.py [--out DOC.rcad.json] [--commands OUT.json]\n  rcad-cli plugins [--json]\n  rcad-cli cloud COMMAND (rcad-cli cloud help)\n  rcad-cli --version"
     );
     ExitCode::from(64)
 }
@@ -75,6 +78,7 @@ fn main() -> ExitCode {
             }
             None => usage(),
         },
+        Some("fusion-script") => fusion::run(&args[1..]),
         Some("plugins") => match args.get(1).map(String::as_str) {
             None => list_plugins(false),
             Some("--json") => list_plugins(true),
