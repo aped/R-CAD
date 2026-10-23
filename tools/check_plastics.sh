@@ -80,6 +80,28 @@ cases["snap_groove"] = ([{"cmd": "new_document"}, rect("WorldXY", 60.0, 40.0), {
        {"thickness": 1.0, "tip_thickness": 1.0, "catch_depth": 0.7, "catch_height": 2.0, "length": 8.0, "width": 5.0},
        {"type": "hook_and_groove"})],
     {1: 9600 + 5 * hook, 2: 3.5 * 20 * 8 - 0.3 * 2.2 * 5.2})
+# F. Bosses with tip fillets (r 0.5): removed A*P - M*2pi per boss (docs/FILLETS.md).
+r = 0.5
+A, M = r * r * (1 - math.pi / 4), r ** 3 * (5 / 6 - math.pi / 4)
+cases["boss_tip"] = ([{"cmd": "new_document"}, rect("WorldXY", 60.0, 40.0), {"cmd": "extrude", "sketch": 1, "distance": 4.0},
+    pts({"Face": face(2, "ExtrudeEndCap")}, [(-15.0, 0.0), (15.0, 0.0)]),
+    pf("boss", {"sketch": sk(3)}, {"height": 8.0, "draft_deg": 0.0, "tip_radius": r})],
+    {1: 9600 + 2 * (math.pi * 9 * 8 - math.pi * 1.25 ** 2 * 6 - (A * 2 * math.pi * 3 - M * 2 * math.pi))})
+# G. Drafted box (3 deg walls, fixed bottom): prismatoid.
+tt = math.tan(math.radians(3))
+area = lambda z: (40 - 2 * tt * z) * (30 - 2 * tt * z)
+cases["draft_box"] = ([{"cmd": "new_document"}, rect("WorldXY", 40.0, 30.0), {"cmd": "extrude", "sketch": 1, "distance": 20.0},
+    pf("draft", {"faces": {"kind": "faces", "faces": [face(2, {"ExtrudeSide": {"entity": e}}) for e in range(1, 5)]},
+                 "fixed": fc({"Face": face(2, "ExtrudeStartCap")})}, {"draft_deg": 3.0})],
+    {1: 20 / 6 * (area(0) + 4 * area(10) + area(20))})
+# H. Half-circle web (r 10, 2 thick) from the rim to the floor of an open box.
+arc_sketch = {"cmd": "create_sketch", "plane": {"Face": face(2, "ExtrudeEndCap")}, "template": "custom", "sketch": {
+    "points": [{"id": 0, "x": 0.0, "y": 0.0}, {"id": 1, "x": 10.0, "y": 0.0}, {"id": 2, "x": -10.0, "y": 0.0}],
+    "entities": [{"Arc": {"id": 1, "center": 0, "start": 1, "end": 2}}],
+    "constraints": [{"FixedPoint": {"p": i, "x": x, "y": 0.0}} for i, x in [(0, 0.0), (1, 10.0), (2, -10.0)]]}}
+cases["arc_web"] = (open_box + [arc_sketch,
+    pf("web", {"sketch": sk(4)}, {"thickness": 2.0, "draft_deg": 0.0}, {"direction": "flip", "extent": "to_next"})],
+    {1: BOX + math.pi / 2 * (11 ** 2 - 9 ** 2) * 18})
 # E. The plastic enclosure example (no closed form: cross-check against R-CAD's volumes).
 ex = json.load(open(f"{repo}/examples/plastic_enclosure_workflow.json"))
 ex = [c for c in ex if c["cmd"] != "save"]
