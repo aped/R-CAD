@@ -64,8 +64,12 @@ The invariants that must hold for plugins as for core features:
    cannot create unchecked geometry. A failing operation fails the feature with the operation's
    label, and the transaction keeps the previous state.
 
-   Further operation kinds (revolve, fillet of an operation's edges, new bodies) are additions to
-   this enum, each mapped to an existing checked kernel path.
+   Two more kinds map to existing checked kernel paths:
+   - `Op::EdgeLoop`: the exact cap-loop fillet/chamfer of an earlier operation's cap;
+   - `Op::ReplaceFace`: the exact topology-preserving face replacement of ADR 0010, used for
+     drafts.
+
+   Further kinds (revolve, new bodies) are additions to this enum on the same terms.
 
 5. **Faces of plugin features are referenceable.** `FaceRole::Plugin { op, of }` names the end
    cap, start cap or side `i` of operation `op`, resolved like a pattern occurrence's face: from

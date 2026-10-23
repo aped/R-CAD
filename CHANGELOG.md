@@ -19,12 +19,21 @@ which format versions a build reads and writes is listed in
   installed opens with that feature failed by name and keeps it. Commands `list_plugins`,
   `plugin_feature`, `set_plugin_data`, `run_plugin_analysis`; `rcad-cli plugins`. Native format
   v10 (written only when used). See `docs/PLUGINS.md`, ADR 0016.
-- **Plastics** (built-in plugin; Autodesk Fusion's Plastic tab as the reference): plastic rules
-  (named nominal values that become parameters and bind new features, with material presets),
-  Boss (pilot/through holes, draft, gusset ribs, mating boss with clearance hole and
-  counterbore), Rib and Web (draft, to next), Snap Fit (hook and groove, hook and loop,
-  perpendicular or stand-off), Lip (lip, groove, lip and groove), Rest, and Design Advice
-  (thickness, variation, draft, undercuts, knife edges). See `docs/PLASTICS.md`.
+- **Plastics** (built-in plugin; Autodesk Fusion's Plastic tab as the reference):
+  - plastic rules: named nominal values that become parameters and bind new features, with
+    material presets; assignable to bodies or assembly components; they also drive core Shell,
+    Fillet, Extrude taper/thin and Thicken (`bind_rule_parameters`);
+  - Boss: pilot/through holes, draft, gusset ribs, tip fillet, and a mating boss with clearance
+    hole and counterbore;
+  - Rib and Web: along lines and arcs, draft, to next;
+  - Snap Fit: hook and groove or hook and loop, perpendicular or stand-off;
+  - Lip: lip, groove, or lip and groove;
+  - Rest: from loops of lines and arcs;
+  - Draft of existing faces (fixed plane);
+  - analyses: Design Advice (thickness, variation, draft, undercuts, knife edges), Draft
+    Analysis, Accessibility Analysis and Minimum Radius Analysis.
+
+  See `docs/PLASTICS.md`.
 - Material catalog: PC, PC/ABS, PP, PA66, POM, HDPE.
 
 - **Optional sync server client.** R-CAD stays complete offline with no account; adding an

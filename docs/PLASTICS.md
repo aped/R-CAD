@@ -2,13 +2,14 @@
 
 The built-in **Plastics** plugin (`crates/rcad-plugin-plastics`, plugin id `plastics`) covers
 plastic part design:
-- plastic rules;
-- Boss, Rib, Web, Snap Fit, Lip and Rest;
-- Design Advice.
+- plastic rules (on bodies or assembly components), which also drive core Shell, Fillet,
+  Extrude taper/thin and Thicken;
+- Boss, Rib, Web, Snap Fit, Lip, Rest and Draft;
+- Design Advice, Draft Analysis, Accessibility Analysis and Minimum Radius Analysis.
 
 The behavioural reference is the Plastic tab of Autodesk Fusion's Design workspace (Fusion
-documentation; no Fusion code or assets are used). Each feature is built from checked prism
-operations (docs/PLUGINS.md): results are exact B-rep and pass the same result gate as Extrude
+documentation; no Fusion code or assets are used). Each feature is built from checked operations
+(docs/PLUGINS.md: prisms, edge-loop blends, face replacement): results are exact B-rep and pass the same result gate as Extrude
 Join/Cut. What that cannot build exactly is refused or listed below as a deviation, never
 approximated.
 
@@ -67,8 +68,14 @@ it.
 
 As in Fusion, features created before the rule was assigned keep their plain values.
 
-**Deviation:** Fusion assigns rules to components. R-CAD assigns them to bodies (one body per
-rule).
+**Components.** As in Fusion, a rule can be assigned to an assembly component
+(`"components": {"<id>": "ABS"}`). Its bodies take the rule's material and new features on them
+bind to it; a body's own assignment wins over its component's.
+
+**Core features.** `bind_rule_parameters {feature}` binds a core feature's rule-driven slots to
+its body's rule: Shell thickness → `T`, Fillet radius → `NR`, Extrude taper → `DA` and thin wall →
+`T`, Thicken distance → `T`. Slots already bound to an expression are kept. The app's dialogs do
+this when "Use plastic rule" is on.
 
 ## Boss
 
@@ -85,7 +92,8 @@ sketch and facing it.
 - ribs: `rib_count` (0–12), `rib_thickness` (1.2, *rule* `0.6*T`), `rib_length` (6, from the
   axis), `rib_height` (6), `rib_chamfer` (3), `rib_tip_height` (2), `rib_angle_deg` (0), `rib_total_deg` (360);
 - mating boss: `mate_diameter` (6), `mate_hole_diameter` (3.4), `cbore_diameter` (6),
-  `cbore_depth` (0: none), `gap` (*rule* `CL`).
+  `cbore_depth` (0: none), `gap` (*rule* `CL`);
+- `tip_radius` (0: none): fillet of the shank top's outer edge.
 
 **Choices:** `hole`: `pilot` | `through` | `none`.
 
@@ -113,23 +121,30 @@ With `mate`, the other body also gets:
 - a mate face that is not parallel and facing;
 - no room for the mating shank.
 
-**Not modelled:** root/tip fillets, drafted ribs, countersinks, alignment steps, fastener
-components.
+**Tip fillet.** An exact cap-loop blend of the shank top, applied last (docs/FILLETS.md). The
+kernel refuses it where gussets reach the top, the hole is within the radius of the edge, or the
+shank is drafted.
+
+**Not modelled:** root fillets (the kernel blends convex cap loops, not the concave base edge),
+drafted ribs, countersinks, alignment steps, fastener components.
 
 ## Rib and Web
 
-Thin walls from open chains of sketch lines.
+Thin walls from open chains of sketch lines and arcs.
 
 **Inputs:** `sketch`; `body` (when the sketch is not on a face).
 
 **Parameters:** `thickness` (*rule* `T`), `depth` (10), `draft_deg` (*rule* `DA`).
 
 **Choices:** `thickness_side`: `symmetric` | `one_side`.
-- Rib also has `side`: `left` | `right`.
+- Rib also has `side`: `left` | `right`, and `extent`: `distance` | `to_next`.
 - Web also has `direction`: `normal` | `flip`, and `extent`: `distance` | `to_next`.
 
 **Rib.** The thickness runs across the sketch plane. The material grows in the plane from each
-line by `depth`, towards `left` (the sketch normal × the line direction) or `right`. Draft
+line by `depth`, towards `left` (the sketch normal × the line direction) or `right`. With
+`to_next` it grows to the nearest planar face of the body in that direction, found by rays from
+points along the curve; the face must be at one distance along the whole curve (a constant-depth
+rib cannot meet a slanted face exactly), else the rib is refused with the distances. Draft
 narrows the rib towards its far edge.
 
 **Web.** The thickness runs across the line in the sketch plane. The material grows along the
@@ -139,9 +154,13 @@ sketch normal by `depth`, or with `to_next` to the nearest face of the sketch's 
 **Corners.** Lines meeting at a point are each extended by half the thickness there, so corners
 are filled.
 
-**Refused:** arcs and circles; a draft that closes the wall before its depth.
+**Arcs.** A rib or web along an arc is the exact annular sector about the arc's centre (a web
+`thickness` wide across it; a rib grown towards or away from the centre).
 
-**Not modelled:** Fusion's "to next" for ribs (explicit depth), fillets, Extend Curves.
+**Refused:** circles; drafted ribs and webs along arcs (the drafted wall would be a cone
+section); a draft that closes the wall before its depth.
+
+**Not modelled:** root fillets (concave blends), Extend Curves.
 
 ## Snap Fit
 
@@ -234,6 +253,28 @@ the thickness; profiles with arcs.
 **Not modelled:** Fusion's top-face limits, trimming at the body, per-side drafts. Wall
 thickness is measured across the walls in the sketch plane.
 
+## Draft
+
+Fusion's fixed-plane draft of existing faces.
+
+**Inputs:** `faces` (planar faces to draft), `fixed` (the fixed plane, a face of the body).
+
+**Parameters:** `draft_deg` (1, *rule* `DA`, 0–30).
+
+**Choices:** `direction`: `pull` | `reverse`.
+
+**Result.** Each face turns about its line on the fixed plane by the angle, relative to its
+current orientation, leaning in as it goes along the pull direction (away from the fixed face,
+into the part); `reverse` leans it out. Built with the kernel's exact face replacement, which
+keeps the body's topology and checks the result.
+
+**Refused:** a face parallel to the fixed plane, a face on another body, and faces the kernel's
+face replacement does not take (not a convex single loop of straight edges with planar
+neighbours, or a vertex with more than one side edge, e.g. a wall with a hole or a filleted
+corner).
+
+**Not modelled:** parting-line drafts, two-sided and symmetric drafts, tangent chains.
+
 ## Design Advice
 
 A read-only analysis (`run_plugin_analysis`, `"analysis": "design_advice"`) of one body for a
@@ -264,6 +305,23 @@ as exact. Each triangle is judged at its centroid. Thickness is a single normal 
 corners it measures through the adjacent wall.
 
 **Not modelled:** a parting-line computation, side actions, rolling-ball thickness.
+
+## Draft, Accessibility and Minimum Radius analyses
+
+Fusion's core Inspect tools for moulded parts, as read-only analyses of one body. Each report
+has a summary, per-face results and per-triangle arrays for colouring the model in the app.
+
+- **`draft_analysis`** (`min_draft_deg` *rule* `DA`): signed draft `asin(n·pull)` per face and
+  triangle, classed positive / negative / insufficient (exact for planes and coaxial
+  cylinders/cones).
+- **`accessibility`**: triangles reachable by a straight ray along the direction (`both`
+  directions: either half of a two-plate mould), split into accessible / blocked / facing away /
+  vertical.
+- **`minimum_radius`** (`min_radius` *rule* `NR`): exact radii of cylinders, a mesh estimate for
+  other curved faces; faces below the threshold flagged.
+
+As for Design Advice, results come from a tessellation within the stated chord except where
+marked exact.
 
 ## Example
 
@@ -303,7 +361,13 @@ rest, a lip and groove, a snap-fit groove and the enclosure example to STEP. Fre
 (OpenCascade) reads each body as one valid solid; volumes agree with the closed forms within
 2e-9 relative, and with R-CAD's own for the enclosure.
 
+**More command tests** (same directory): boss tip fillets against the cap-loop oracle, rib to
+next, ribs/webs along arcs (annular sectors), rounded rests, component rules, core shell rule
+binding, and drafts of a box against the prismatoid volume (1e-9).
+
 **Unit tests:**
 - `crates/rcad-plugin-plastics/tests/advice.rs`: analytic meshes for thickness, draft (exact
   2°), undercuts, variation, knife edges and refusals, plus a 19,600-triangle performance check.
+- `crates/rcad-plugin-plastics/tests/analyses.rs`: draft classes and signs, accessibility with
+  slots and voids, exact and estimated radii, refusals, 20k-triangle timings.
 - `crates/rcad-plugin-plastics/src`: manifest and rule templates.

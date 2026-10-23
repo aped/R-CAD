@@ -32,19 +32,31 @@ A build is deterministic and has no access to the document beyond its request.
 |---|---|
 | `face` | `frame` (origin on the face, `z` the outward normal), `body` id, `loops` (outer boundary first, then inner loops, exact lines/arcs in plane coordinates; empty if the boundary has other curves), `body_span` (the body's extent along `z` from its bounding box, conservative off-axis), `parallel` (every planar face of the body parallel to this one: `height` along `z`, `facing` ±1) |
 | `faces` | a list of the above |
-| `body` | `body` id and world bounding box |
-| `sketch` | `frame`, solved non-construction `curves` (lines, arcs, circles), standalone `points` (used by no curve; not the sketch origin), the `body` whose face the sketch is on (or offset from), and that body's `parallel` planes |
+| `body` | `body` id, world bounding box, and its planar `faces` (point, outward normal, boundary loops sampled along curved edges) for ray queries (`geom::ray_to_face`) |
+| `sketch` | `frame`, solved non-construction `curves` (lines, arcs, circles), standalone `points` (used by no curve; not the sketch origin), the `body` whose face the sketch is on (or offset from), and that body's `parallel` planes and planar `faces` |
 | `points` | plane points as stored (in the plane of the feature's face input) |
 
 `rcad_plugin::geom::{next_below, next_above}` find "to next" faces in `parallel`.
 
 ### Operations
 
-One kind today:
+Three kinds:
 
 ```text
-Prism { id, body, frame, profile, holes, from, to, taper_deg, mode, label }
+Prism       { id, body, frame, profile, holes, from, to, taper_deg, mode, label }
+EdgeLoop    { id, of, end, blend: fillet|chamfer, size, holes, label }
+ReplaceFace { id, face, index, origin, normal, label }
 ```
+
+- `EdgeLoop` rounds or bevels the outer edge loop (with `holes`, also the inner loops) of the end
+  or start cap of earlier prism `of`. This is the kernel's exact cap-loop blend
+  (docs/FILLETS.md), which checks its result against the closed-form removed volume. Where
+  several faces lie in the cap's plane, the one holding the cap frame's origin is blended.
+- `ReplaceFace` replaces a planar face of a `face`/`faces` input by another plane, keeping
+  topology: the kernel's exact face replacement (ADR 0010 preconditions), checked by probes.
+  Used for drafts.
+
+Prism details:
 
 - The region `profile` minus `holes` is drawn in `frame`'s plane coordinates.
 - It is swept along `frame.z` over `[from, to]`.
@@ -101,6 +113,7 @@ the feature regenerates once the plugin is installed.
 | `list_plugins` | | `Response.plugins`: each `{manifest, builtin}` |
 | `plugin_feature` | `name?`, `plugin`, `feature`, `inputs` (name → `{"kind": "face", "plane": …}` / `{"kind": "faces", "faces": […]}` / `{"kind": "body", "body": 1}` / `{"kind": "sketch", "sketch": 4}` / `{"kind": "points", "points": [[x, y], …]}`), `params?` (name → number), `choices?`, `expressions?` (slot → expression), `use_rules?` (default true) | `Response.feature`. Parameters not given take their defaults. Each one with a rule template is bound to the rule of the feature's body, if that body has one (see below) |
 | `set_plugin_data` | `plugin`, `data` (JSON, or `null` to remove) | Validated by the plugin. Its effects (parameters, materials) are applied in the same undo step |
+| `bind_rule_parameters` | `feature`, `plugin?` | Binds a core feature's rule-driven slots (as declared by `core_rule_templates`) to its body's rule |
 | `run_plugin_analysis` | `plugin`, `analysis`, `inputs`, `params?`, `choices?`, `chord?` (mm, default 0.05), `use_rules?` | `Response.plugin_report` (JSON). Rule templates are evaluated to numbers for parameters not given |
 
 Edit a plugin feature with `redefine_feature` (`kind`: the edited `FeatureKind::Plugin`).
@@ -109,7 +122,9 @@ plugins.
 
 ### Rules and bindings
 
-A plugin may expose rule symbols for a body (`Plugin::rule_symbols`), for example `T → ABS_T`.
+A plugin may expose rule symbols for a body and its assembly component (`Plugin::rule_symbols_in`),
+for example `T → ABS_T`. `Plugin::core_rule_templates` names the core-feature slots its rules
+drive (`bind_rule_parameters`).
 When a feature is created with `use_rules`, every parameter that has a `rule` template and was
 not given explicitly is bound to the expanded template. `T/2` becomes the expression `ABS_T/2`.
 Changing the rule's data updates the parameters, and every bound feature follows. Parameters
@@ -154,8 +169,10 @@ are reported and never stop the program.
 -> {"method": "build",         "request": BuildRequest}       <- {"ok": [Op, ...]}
 -> {"method": "analyze",       "request": AnalysisRequest}    <- {"ok": <report>}
 -> {"method": "validate_data", "data": <json>}                <- {"ok": null}
--> {"method": "data_effects",  "data": <json>}                <- {"ok": {"parameters": [...], "materials": [[body, key]]}}
--> {"method": "rule_symbols",  "data": <json>, "body": 3}     <- {"ok": {"T": "ABS_T"}}
+-> {"method": "data_effects",  "data": <json>, "components": {"<id>": [bodies]}}
+                                                              <- {"ok": {"parameters": [...], "materials": [[body, key]]}}
+-> {"method": "rule_symbols",  "data": <json>, "body": 3, "component": 1}
+                                                              <- {"ok": {"T": "ABS_T"}}
 any method                                                    <- {"error": "why"}  (refused, shown to the user)
 ```
 
