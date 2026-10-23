@@ -1,0 +1,27 @@
+{
+  "id": "vent-slots",
+  "name": "Vent slots",
+  "version": "1.0.0",
+  "api_version": 1,
+  "description": "A row of rounded ventilation slots cut into a planar face (example external plugin).",
+  "command": ["python3", "-I", "plugin.py"],
+  "timeout_secs": 10,
+  "features": [
+    {
+      "id": "vent_slots",
+      "name": "Vent slots",
+      "description": "Parallel rounded slots centred on the face origin, cut to a depth or through the body.",
+      "inputs": [
+        {"name": "face", "label": "Face", "kind": "face"}
+      ],
+      "params": [
+        {"name": "count", "label": "Count", "kind": "count", "default": 5, "min": 1, "max": 50},
+        {"name": "slot_width", "label": "Slot width", "kind": "length", "default": 2, "min": 0, "exclusive_min": true},
+        {"name": "slot_length", "label": "Slot length", "kind": "length", "default": 20, "min": 0, "exclusive_min": true},
+        {"name": "pitch", "label": "Pitch", "kind": "length", "default": 4, "min": 0, "exclusive_min": true},
+        {"name": "depth", "label": "Depth (0 = through)", "kind": "length", "default": 0, "min": 0},
+        {"name": "rotation_deg", "label": "Rotation", "kind": "angle", "default": 0, "min": -360, "max": 360}
+      ]
+    }
+  ]
+}
