@@ -172,9 +172,15 @@ that is neither `ok` nor `error` fails the call.
 plugin runs with your user's permissions, as Fusion add-ins do. Install plugins you trust.
 Documents never contain plugin code.
 
-The example `examples/plugins/vent-slots` (Python, standard library only) cuts rounded slots
-into a face. `crates/rcad-commands/tests/it/external_plugin.rs` uses it through a document:
-creation, a parameter edit, then save and reload.
+**Writing one in Python.** `examples/plugins/standoffs/rcad_plugin.py` is a one-file,
+standard-library helper. Copy it next to your script. It reads the request, dispatches to
+`@plugin.feature("id")` / `@plugin.analysis("id")` functions, answers `Refusal("why")` as a
+refusal, and provides profile, frame and `prism` helpers.
+
+**Examples.**
+- `examples/plugins/standoffs` uses the helper: posts with pilot holes at `points` on a face.
+- `examples/plugins/vent-slots` speaks the protocol directly: rounded slots cut into a face. `crates/rcad-commands/tests/it/external_plugin.rs` uses both through a document: creation
+against closed-form volumes, a parameter edit, a plugin refusal, then save and reload.
 
 ## Writing a built-in plugin
 

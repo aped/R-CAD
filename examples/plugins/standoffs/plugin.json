@@ -1,0 +1,26 @@
+{
+  "id": "standoffs",
+  "name": "Standoffs",
+  "version": "1.0.0",
+  "api_version": 1,
+  "description": "PCB mounting posts with pilot holes at points on a face (example plugin using rcad_plugin.py).",
+  "command": ["python3", "-I", "plugin.py"],
+  "timeout_secs": 10,
+  "features": [
+    {
+      "id": "standoffs",
+      "name": "Standoffs",
+      "description": "A post with a pilot hole at each point.",
+      "inputs": [
+        {"name": "face", "label": "Face", "kind": "face"},
+        {"name": "points", "label": "Post positions", "kind": "points"}
+      ],
+      "params": [
+        {"name": "height", "label": "Height", "kind": "length", "default": 6, "min": 0, "exclusive_min": true},
+        {"name": "diameter", "label": "Outer diameter", "kind": "length", "default": 5, "min": 0, "exclusive_min": true},
+        {"name": "hole_diameter", "label": "Hole diameter", "kind": "length", "default": 2.5, "min": 0, "exclusive_min": true},
+        {"name": "hole_depth", "label": "Hole depth", "kind": "length", "default": 5, "min": 0, "exclusive_min": true}
+      ]
+    }
+  ]
+}
