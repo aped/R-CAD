@@ -25,7 +25,7 @@
 //! either).
 use crate::util::{EPS, SINK, invalid, placement_points, prism, standing};
 use crate::{choice, input, param};
-use rcad_plugin::geom::next_below;
+use rcad_plugin::geom::{footprint_of, next_below_over};
 use rcad_plugin::schema::FeatureSchema;
 use rcad_plugin::{BuildRequest, InputKind, Mode, Op, ParamKind, PluginError, Profile};
 
@@ -228,10 +228,12 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
     if pts.is_empty() {
         return Err(invalid(F, "the sketch has no points to place snap fits at"));
     }
+    // Faces under the hooks (their width around each point).
+    let fp = footprint_of(&pts, p("width")?.max(p("thickness")?));
     let y0 = match req.choice("orientation")? {
         "parallel" => {
             let d = match req.choice("extent")? {
-                "to_next" => -next_below(&s.parallel, 0.0, EPS).ok_or_else(|| {
+                "to_next" => -next_below_over(&s.parallel, 0.0, EPS, &fp).ok_or_else(|| {
                     invalid(
                         F,
                         "to next: no face of the body below the sketch plane faces it",
@@ -242,7 +244,7 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
             -(d + SINK)
         }
         _ => {
-            if next_below(&s.parallel, EPS, 0.0).is_none_or(|h| h.abs() > EPS) {
+            if next_below_over(&s.parallel, EPS, 0.0, &fp).is_none_or(|h| h.abs() > EPS) {
                 return Err(invalid(
                     F,
                     "a perpendicular hook stands on the face its sketch lies on",

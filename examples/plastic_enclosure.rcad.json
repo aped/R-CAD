@@ -1,0 +1,1079 @@
+{
+  "format": "r-cad",
+  "version": 10,
+  "document": {
+    "features": [
+      {
+        "id": 1,
+        "name": "Base outline",
+        "kind": {
+          "type": "Sketch",
+          "plane": "WorldXY",
+          "sketch": {
+            "points": [
+              {
+                "id": 0,
+                "x": 0.0,
+                "y": 0.0
+              },
+              {
+                "id": 1,
+                "x": -40.0,
+                "y": -25.0
+              },
+              {
+                "id": 2,
+                "x": 40.0,
+                "y": -25.0
+              },
+              {
+                "id": 3,
+                "x": 40.0,
+                "y": 25.0
+              },
+              {
+                "id": 4,
+                "x": -40.0,
+                "y": 25.0
+              }
+            ],
+            "entities": [
+              {
+                "Line": {
+                  "id": 1,
+                  "a": 1,
+                  "b": 2
+                }
+              },
+              {
+                "Line": {
+                  "id": 2,
+                  "a": 2,
+                  "b": 3
+                }
+              },
+              {
+                "Line": {
+                  "id": 3,
+                  "a": 3,
+                  "b": 4
+                }
+              },
+              {
+                "Line": {
+                  "id": 4,
+                  "a": 4,
+                  "b": 1
+                }
+              }
+            ],
+            "constraints": [
+              {
+                "FixedPoint": {
+                  "p": 0,
+                  "x": 0.0,
+                  "y": 0.0
+                }
+              },
+              {
+                "Horizontal": {
+                  "line": 1
+                }
+              },
+              {
+                "Horizontal": {
+                  "line": 3
+                }
+              },
+              {
+                "Vertical": {
+                  "line": 2
+                }
+              },
+              {
+                "Vertical": {
+                  "line": 4
+                }
+              },
+              {
+                "HorizontalDistance": {
+                  "a": 1,
+                  "b": 2,
+                  "dim": {
+                    "name": "width",
+                    "value": 80.0
+                  }
+                }
+              },
+              {
+                "VerticalDistance": {
+                  "a": 1,
+                  "b": 4,
+                  "dim": {
+                    "name": "height",
+                    "value": 50.0
+                  }
+                }
+              },
+              {
+                "SymmetricAboutPoint": {
+                  "a": 1,
+                  "b": 3,
+                  "center": 0
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": 2,
+        "name": "Extrude1",
+        "kind": {
+          "type": "Extrude",
+          "sketch": 1,
+          "distance": 25.0,
+          "operation": {
+            "NewBody": {
+              "body": 1
+            }
+          },
+          "extent": "Distance",
+          "reverse": false
+        }
+      },
+      {
+        "id": 3,
+        "name": "Shell1",
+        "kind": {
+          "type": "ShellFace",
+          "face": {
+            "feature": 2,
+            "role": "ExtrudeEndCap"
+          },
+          "thickness": 2.0
+        }
+      },
+      {
+        "id": 4,
+        "name": "Lid outline",
+        "kind": {
+          "type": "Sketch",
+          "plane": {
+            "Offset": {
+              "base": "WorldXY",
+              "distance": 25.0
+            }
+          },
+          "sketch": {
+            "points": [
+              {
+                "id": 0,
+                "x": 0.0,
+                "y": 0.0
+              },
+              {
+                "id": 1,
+                "x": -40.0,
+                "y": -25.0
+              },
+              {
+                "id": 2,
+                "x": 40.0,
+                "y": -25.0
+              },
+              {
+                "id": 3,
+                "x": 40.0,
+                "y": 25.0
+              },
+              {
+                "id": 4,
+                "x": -40.0,
+                "y": 25.0
+              }
+            ],
+            "entities": [
+              {
+                "Line": {
+                  "id": 1,
+                  "a": 1,
+                  "b": 2
+                }
+              },
+              {
+                "Line": {
+                  "id": 2,
+                  "a": 2,
+                  "b": 3
+                }
+              },
+              {
+                "Line": {
+                  "id": 3,
+                  "a": 3,
+                  "b": 4
+                }
+              },
+              {
+                "Line": {
+                  "id": 4,
+                  "a": 4,
+                  "b": 1
+                }
+              }
+            ],
+            "constraints": [
+              {
+                "FixedPoint": {
+                  "p": 0,
+                  "x": 0.0,
+                  "y": 0.0
+                }
+              },
+              {
+                "Horizontal": {
+                  "line": 1
+                }
+              },
+              {
+                "Horizontal": {
+                  "line": 3
+                }
+              },
+              {
+                "Vertical": {
+                  "line": 2
+                }
+              },
+              {
+                "Vertical": {
+                  "line": 4
+                }
+              },
+              {
+                "HorizontalDistance": {
+                  "a": 1,
+                  "b": 2,
+                  "dim": {
+                    "name": "width",
+                    "value": 80.0
+                  }
+                }
+              },
+              {
+                "VerticalDistance": {
+                  "a": 1,
+                  "b": 4,
+                  "dim": {
+                    "name": "height",
+                    "value": 50.0
+                  }
+                }
+              },
+              {
+                "SymmetricAboutPoint": {
+                  "a": 1,
+                  "b": 3,
+                  "center": 0
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": 5,
+        "name": "Extrude2",
+        "kind": {
+          "type": "Extrude",
+          "sketch": 4,
+          "distance": 6.0,
+          "operation": {
+            "NewBody": {
+              "body": 2
+            }
+          },
+          "extent": "Distance",
+          "reverse": false
+        }
+      },
+      {
+        "id": 6,
+        "name": "Shell2",
+        "kind": {
+          "type": "ShellFace",
+          "face": {
+            "feature": 5,
+            "role": "ExtrudeStartCap"
+          },
+          "thickness": 2.0
+        }
+      },
+      {
+        "id": 7,
+        "name": "Lip and groove",
+        "kind": {
+          "type": "Plugin",
+          "plugin": "plastics",
+          "feature": "lip",
+          "plugin_version": "1.0.0",
+          "inputs": {
+            "face": {
+              "kind": "face",
+              "plane": {
+                "Face": {
+                  "feature": 2,
+                  "role": "ExtrudeEndCap"
+                }
+              }
+            },
+            "mate": {
+              "kind": "face",
+              "plane": {
+                "Face": {
+                  "feature": 5,
+                  "role": "ExtrudeStartCap"
+                }
+              }
+            }
+          },
+          "params": {
+            "clearance": {
+              "value": 0.1,
+              "kind": "length"
+            },
+            "height": {
+              "value": 2.0,
+              "kind": "length"
+            },
+            "width": {
+              "value": 1.0,
+              "kind": "length"
+            }
+          },
+          "choices": {
+            "position": "outer",
+            "type": "lip_and_groove"
+          }
+        },
+        "expressions": {
+          "clearance": "ABS_CL",
+          "height": "ABS_RH",
+          "width": "ABS_T/2"
+        }
+      },
+      {
+        "id": 8,
+        "name": "Boss points",
+        "kind": {
+          "type": "Sketch",
+          "plane": {
+            "Offset": {
+              "base": {
+                "Face": {
+                  "feature": 2,
+                  "role": "ExtrudeEndCap"
+                }
+              },
+              "distance": -23.0
+            }
+          },
+          "sketch": {
+            "points": [
+              {
+                "id": 0,
+                "x": -32.0,
+                "y": -17.0
+              },
+              {
+                "id": 1,
+                "x": 32.0,
+                "y": -17.0
+              },
+              {
+                "id": 2,
+                "x": 32.0,
+                "y": 17.0
+              },
+              {
+                "id": 3,
+                "x": -32.0,
+                "y": 17.0
+              }
+            ],
+            "entities": [],
+            "constraints": [
+              {
+                "FixedPoint": {
+                  "p": 0,
+                  "x": -32.0,
+                  "y": -17.0
+                }
+              },
+              {
+                "FixedPoint": {
+                  "p": 1,
+                  "x": 32.0,
+                  "y": -17.0
+                }
+              },
+              {
+                "FixedPoint": {
+                  "p": 2,
+                  "x": 32.0,
+                  "y": 17.0
+                }
+              },
+              {
+                "FixedPoint": {
+                  "p": 3,
+                  "x": -32.0,
+                  "y": 17.0
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": 9,
+        "name": "Screw bosses",
+        "kind": {
+          "type": "Plugin",
+          "plugin": "plastics",
+          "feature": "boss",
+          "plugin_version": "1.0.0",
+          "inputs": {
+            "mate": {
+              "kind": "face",
+              "plane": {
+                "Offset": {
+                  "base": {
+                    "Face": {
+                      "feature": 5,
+                      "role": "ExtrudeStartCap"
+                    }
+                  },
+                  "distance": -4.0
+                }
+              }
+            },
+            "sketch": {
+              "kind": "sketch",
+              "sketch": 8
+            }
+          },
+          "params": {
+            "cbore_depth": {
+              "value": 1.0,
+              "kind": "length"
+            },
+            "cbore_diameter": {
+              "value": 6.0,
+              "kind": "length"
+            },
+            "diameter": {
+              "value": 6.0,
+              "kind": "length"
+            },
+            "draft_deg": {
+              "value": 0.0,
+              "kind": "angle"
+            },
+            "gap": {
+              "value": 0.1,
+              "kind": "length"
+            },
+            "height": {
+              "value": 20.0,
+              "kind": "length"
+            },
+            "hole_depth": {
+              "value": 8.0,
+              "kind": "length"
+            },
+            "hole_diameter": {
+              "value": 2.5,
+              "kind": "length"
+            },
+            "hole_draft_deg": {
+              "value": 0.0,
+              "kind": "angle"
+            },
+            "mate_diameter": {
+              "value": 6.0,
+              "kind": "length"
+            },
+            "mate_hole_diameter": {
+              "value": 3.4,
+              "kind": "length"
+            },
+            "rib_angle_deg": {
+              "value": 45.0,
+              "kind": "angle"
+            },
+            "rib_count": {
+              "value": 4.0,
+              "kind": "count"
+            },
+            "rib_height": {
+              "value": 12.0,
+              "kind": "length"
+            },
+            "rib_length": {
+              "value": 7.0,
+              "kind": "length"
+            },
+            "rib_thickness": {
+              "value": 1.2,
+              "kind": "length"
+            },
+            "rib_tip_height": {
+              "value": 3.0,
+              "kind": "length"
+            },
+            "rib_total_deg": {
+              "value": 360.0,
+              "kind": "angle"
+            }
+          },
+          "choices": {
+            "hole": "pilot"
+          }
+        },
+        "expressions": {
+          "gap": "ABS_CL",
+          "rib_thickness": "0.6*ABS_T"
+        }
+      },
+      {
+        "id": 10,
+        "name": "Web line",
+        "kind": {
+          "type": "Sketch",
+          "plane": {
+            "Offset": {
+              "base": {
+                "Face": {
+                  "feature": 2,
+                  "role": "ExtrudeEndCap"
+                }
+              },
+              "distance": -10.0
+            }
+          },
+          "sketch": {
+            "points": [
+              {
+                "id": 0,
+                "x": 0.0,
+                "y": -24.0
+              },
+              {
+                "id": 1,
+                "x": 0.0,
+                "y": 24.0
+              }
+            ],
+            "entities": [
+              {
+                "Line": {
+                  "id": 1,
+                  "a": 0,
+                  "b": 1
+                }
+              }
+            ],
+            "constraints": [
+              {
+                "FixedPoint": {
+                  "p": 0,
+                  "x": 0.0,
+                  "y": -24.0
+                }
+              },
+              {
+                "FixedPoint": {
+                  "p": 1,
+                  "x": 0.0,
+                  "y": 24.0
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": 11,
+        "name": "Stiffening web",
+        "kind": {
+          "type": "Plugin",
+          "plugin": "plastics",
+          "feature": "web",
+          "plugin_version": "1.0.0",
+          "inputs": {
+            "sketch": {
+              "kind": "sketch",
+              "sketch": 10
+            }
+          },
+          "params": {
+            "depth": {
+              "value": 10.0,
+              "kind": "length"
+            },
+            "draft_deg": {
+              "value": 1.0,
+              "kind": "angle"
+            },
+            "thickness": {
+              "value": 2.0,
+              "kind": "length"
+            }
+          },
+          "choices": {
+            "direction": "flip",
+            "extent": "to_next",
+            "thickness_side": "symmetric"
+          }
+        },
+        "expressions": {
+          "draft_deg": "ABS_DA",
+          "thickness": "ABS_T"
+        }
+      },
+      {
+        "id": 12,
+        "name": "Rest outline",
+        "kind": {
+          "type": "Sketch",
+          "plane": {
+            "Offset": {
+              "base": {
+                "Face": {
+                  "feature": 2,
+                  "role": "ExtrudeEndCap"
+                }
+              },
+              "distance": -15.0
+            }
+          },
+          "sketch": {
+            "points": [
+              {
+                "id": 0,
+                "x": 0.0,
+                "y": 0.0
+              },
+              {
+                "id": 1,
+                "x": -8.0,
+                "y": -5.0
+              },
+              {
+                "id": 2,
+                "x": 8.0,
+                "y": -5.0
+              },
+              {
+                "id": 3,
+                "x": 8.0,
+                "y": 5.0
+              },
+              {
+                "id": 4,
+                "x": -8.0,
+                "y": 5.0
+              }
+            ],
+            "entities": [
+              {
+                "Line": {
+                  "id": 1,
+                  "a": 1,
+                  "b": 2
+                }
+              },
+              {
+                "Line": {
+                  "id": 2,
+                  "a": 2,
+                  "b": 3
+                }
+              },
+              {
+                "Line": {
+                  "id": 3,
+                  "a": 3,
+                  "b": 4
+                }
+              },
+              {
+                "Line": {
+                  "id": 4,
+                  "a": 4,
+                  "b": 1
+                }
+              }
+            ],
+            "constraints": [
+              {
+                "FixedPoint": {
+                  "p": 0,
+                  "x": 18.0,
+                  "y": 0.0
+                }
+              },
+              {
+                "Horizontal": {
+                  "line": 1
+                }
+              },
+              {
+                "Horizontal": {
+                  "line": 3
+                }
+              },
+              {
+                "Vertical": {
+                  "line": 2
+                }
+              },
+              {
+                "Vertical": {
+                  "line": 4
+                }
+              },
+              {
+                "HorizontalDistance": {
+                  "a": 1,
+                  "b": 2,
+                  "dim": {
+                    "name": "width",
+                    "value": 16.0
+                  }
+                }
+              },
+              {
+                "VerticalDistance": {
+                  "a": 1,
+                  "b": 4,
+                  "dim": {
+                    "name": "height",
+                    "value": 10.0
+                  }
+                }
+              },
+              {
+                "SymmetricAboutPoint": {
+                  "a": 1,
+                  "b": 3,
+                  "center": 0
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": 13,
+        "name": "PCB rest",
+        "kind": {
+          "type": "Plugin",
+          "plugin": "plastics",
+          "feature": "rest",
+          "plugin_version": "1.0.0",
+          "inputs": {
+            "sketch": {
+              "kind": "sketch",
+              "sketch": 12
+            }
+          },
+          "params": {
+            "depth": {
+              "value": 10.0,
+              "kind": "length"
+            },
+            "draft_deg": {
+              "value": 1.0,
+              "kind": "angle"
+            },
+            "offset": {
+              "value": 0.0,
+              "kind": "length"
+            },
+            "thickness": {
+              "value": 2.0,
+              "kind": "length"
+            }
+          },
+          "choices": {
+            "extent": "to_next"
+          }
+        },
+        "expressions": {
+          "draft_deg": "ABS_DA",
+          "thickness": "ABS_T"
+        }
+      },
+      {
+        "id": 14,
+        "name": "Snap points",
+        "kind": {
+          "type": "Sketch",
+          "plane": {
+            "Offset": {
+              "base": {
+                "Face": {
+                  "feature": 5,
+                  "role": "ExtrudeStartCap"
+                }
+              },
+              "distance": -4.0
+            }
+          },
+          "sketch": {
+            "points": [
+              {
+                "id": 0,
+                "x": -20.0,
+                "y": -21.5
+              },
+              {
+                "id": 1,
+                "x": 20.0,
+                "y": -21.5
+              }
+            ],
+            "entities": [],
+            "constraints": [
+              {
+                "FixedPoint": {
+                  "p": 0,
+                  "x": -20.0,
+                  "y": -21.5
+                }
+              },
+              {
+                "FixedPoint": {
+                  "p": 1,
+                  "x": 20.0,
+                  "y": -21.5
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": 15,
+        "name": "Snap hook",
+        "kind": {
+          "type": "Plugin",
+          "plugin": "plastics",
+          "feature": "snap_fit",
+          "plugin_version": "1.0.0",
+          "inputs": {
+            "mate": {
+              "kind": "body",
+              "body": 1
+            },
+            "sketch": {
+              "kind": "sketch",
+              "sketch": 14
+            }
+          },
+          "params": {
+            "base_depth": {
+              "value": 5.0,
+              "kind": "length"
+            },
+            "catch_depth": {
+              "value": 0.6666666666666666,
+              "kind": "length"
+            },
+            "catch_height": {
+              "value": 2.0,
+              "kind": "length"
+            },
+            "clearance": {
+              "value": 0.1,
+              "kind": "length"
+            },
+            "insertion_deg": {
+              "value": 30.0,
+              "kind": "angle"
+            },
+            "length": {
+              "value": 8.0,
+              "kind": "length"
+            },
+            "loop_length": {
+              "value": 3.0,
+              "kind": "length"
+            },
+            "loop_thickness": {
+              "value": 1.5,
+              "kind": "length"
+            },
+            "retention_deg": {
+              "value": 90.0,
+              "kind": "angle"
+            },
+            "rotation_deg": {
+              "value": -90.0,
+              "kind": "angle"
+            },
+            "thickness": {
+              "value": 1.0,
+              "kind": "length"
+            },
+            "tip_thickness": {
+              "value": 1.0,
+              "kind": "length"
+            },
+            "width": {
+              "value": 6.0,
+              "kind": "length"
+            }
+          },
+          "choices": {
+            "extent": "to_next",
+            "orientation": "perpendicular",
+            "type": "hook_and_groove"
+          }
+        },
+        "expressions": {
+          "catch_depth": "ABS_T/3",
+          "catch_height": "ABS_T",
+          "clearance": "ABS_CL",
+          "thickness": "ABS_T/2",
+          "tip_thickness": "ABS_T/2"
+        }
+      }
+    ],
+    "next_id": 16,
+    "bodies": [
+      {
+        "id": 1,
+        "name": "Base",
+        "visible": true,
+        "material": {
+          "name": "ABS",
+          "density": 1.04,
+          "catalog": "abs"
+        }
+      },
+      {
+        "id": 2,
+        "name": "Lid",
+        "visible": true,
+        "material": {
+          "name": "ABS",
+          "density": 1.04,
+          "catalog": "abs"
+        }
+      }
+    ],
+    "next_body_id": 3,
+    "blobs": [],
+    "next_blob_id": 1,
+    "parameters": [
+      {
+        "name": "ABS_T",
+        "expression": "2 mm",
+        "unit": "mm",
+        "comment": "plastic rule ABS: nominal wall thickness"
+      },
+      {
+        "name": "ABS_DA",
+        "expression": "1",
+        "unit": "deg",
+        "comment": "plastic rule ABS: nominal draft angle (degrees)"
+      },
+      {
+        "name": "ABS_NR",
+        "expression": "0.5*ABS_T",
+        "unit": "mm",
+        "comment": "plastic rule ABS: nominal inner radius"
+      },
+      {
+        "name": "ABS_CL",
+        "expression": "0.1 mm",
+        "unit": "mm",
+        "comment": "plastic rule ABS: clearance between mating features"
+      },
+      {
+        "name": "ABS_RH",
+        "expression": "ABS_T",
+        "unit": "mm",
+        "comment": "plastic rule ABS: lip height (reveal)"
+      },
+      {
+        "name": "ABS_TMIN",
+        "expression": "0.5*ABS_T",
+        "unit": "mm",
+        "comment": "plastic rule ABS: design advice: minimum thickness"
+      },
+      {
+        "name": "ABS_TMAX",
+        "expression": "1.5*ABS_T",
+        "unit": "mm",
+        "comment": "plastic rule ABS: design advice: maximum thickness"
+      },
+      {
+        "name": "ABS_TV",
+        "expression": "0.15",
+        "unit": "unitless",
+        "comment": "plastic rule ABS: design advice: allowed thickness variation (ratio)"
+      },
+      {
+        "name": "ABS_MDA",
+        "expression": "0.5",
+        "unit": "deg",
+        "comment": "plastic rule ABS: design advice: minimum draft angle (degrees)"
+      },
+      {
+        "name": "ABS_KE",
+        "expression": "0.5*ABS_T",
+        "unit": "mm",
+        "comment": "plastic rule ABS: design advice: knife-edge thickness threshold"
+      }
+    ],
+    "plugin_data": {
+      "plastics": {
+        "bodies": {
+          "1": "ABS",
+          "2": "ABS"
+        },
+        "rules": [
+          {
+            "material": "abs",
+            "name": "ABS",
+            "values": {
+              "DA": "1",
+              "T": "2 mm"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "cache": {
+    "volume": 9913.31667,
+    "bounds": {
+      "min": [
+        -40.0,
+        -25.0,
+        21.0
+      ],
+      "max": [
+        40.0,
+        25.0,
+        31.0
+      ]
+    },
+    "face_count": 76
+  }
+}

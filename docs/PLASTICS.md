@@ -104,6 +104,8 @@ With `mate`, the other body also gets:
 **Refused:**
 - a hole not narrower than the drafted top;
 - a pilot deeper than the material;
+- ribs on a drafted shank (the kernel cannot join planar ribs to a cone yet; use a straight
+  shank with ribs);
 - ribs on a base thinner than 0.4 mm;
 - a mate face that is not parallel and facing;
 - no room for the mating shank.
@@ -257,6 +259,22 @@ as exact. Each triangle is judged at its centroid. Thickness is a single normal 
 corners it measures through the adjacent wall.
 
 **Not modelled:** a parting-line computation, side actions, rolling-ball thickness.
+
+## Example
+
+`examples/plastic_enclosure_workflow.json` (`rcad-cli run`, replayed by `cargo xtask check`)
+builds an 80 × 50 enclosure from scratch:
+- a shelled base and lid with an ABS rule on both;
+- an outer lip and groove;
+- four screw bosses with gussets mating counterbored lid bosses;
+- a drafted web to the floor;
+- a drafted rest;
+- two snap hooks from the lid catching windows in the base walls;
+- Design Advice on the base.
+
+It saves `examples/plastic_enclosure.rcad.json`. Order matters as in Fusion: the lip comes right
+after the shells, because the lip's band is joined to the rim, and once drafted features have
+made the body non-prismatic that join can fail.
 
 ## Evidence
 

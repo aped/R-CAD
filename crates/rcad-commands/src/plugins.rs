@@ -346,25 +346,19 @@ fn body_mesh(m: &Model, body: BodyId, chord: f64) -> Result<rp::BodyMesh, DocErr
         feature: FeatureId(0),
         detail: format!("tessellation of {body}: {e}"),
     })?;
-    let kinds = rcad_kernel::classify_faces(brep).map_err(|e| DocError::Kernel {
-        feature: FeatureId(0),
-        detail: format!("faces of {body}: {e}"),
-    })?;
+    // Exact face kinds where the kernel can classify the body; otherwise
+    // (e.g. implicit intersection edges after curved joins) every face is
+    // `Other` and analyses work from the tessellation alone.
     let nf = mesh
         .tri_face
         .iter()
         .map(|&f| f as usize + 1)
         .max()
         .unwrap_or(0);
-    if nf > kinds.len() {
-        return Err(DocError::Kernel {
-            feature: FeatureId(0),
-            detail: format!(
-                "{body}: tessellation names {nf} faces, the body has {}",
-                kinds.len()
-            ),
-        });
-    }
+    let kinds = rcad_kernel::classify_faces(brep)
+        .ok()
+        .filter(|k| k.len() >= nf)
+        .unwrap_or_else(|| vec![rcad_kernel::DirectFace::Other; nf]);
     let mut area = vec![0.0; kinds.len()];
     for (t, tri) in mesh.triangles.iter().enumerate() {
         let [a, b, c] = tri.map(|i| mesh.positions[i as usize]);

@@ -645,6 +645,69 @@ pub fn face_planes(body: &Body) -> Vec<FacePlane> {
     out
 }
 
+/// A planar face of a body parallel to a reference frame's plane: its
+/// height along the frame's `z` (relative to the origin), the sign of its
+/// outward normal along `z`, and the bounding box of its boundary in the
+/// frame's plane coordinates (from the boundary vertices and 16 samples per
+/// edge, so curved edges bulge at most a chord sag beyond it).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct ParallelFace {
+    pub height: f64,
+    pub facing: f64,
+    pub min: [f64; 2],
+    pub max: [f64; 2],
+}
+
+/// Every planar face of `body` parallel to `frame`'s plane (not
+/// deduplicated: two faces in one plane are two entries), by height.
+pub fn parallel_faces(body: &Body, frame: &Frame) -> Result<Vec<ParallelFace>> {
+    guarded("parallel_faces", || {
+        let z = Vector3::new(frame.z[0], frame.z[1], frame.z[2]);
+        let x = Vector3::new(frame.x[0], frame.x[1], frame.x[2]);
+        let y = Vector3::new(frame.y[0], frame.y[1], frame.y[2]);
+        let o = Point3::new(frame.origin[0], frame.origin[1], frame.origin[2]);
+        let mut out = Vec::new();
+        for f in body.solid.face_iter() {
+            let Surface::Plane(pl) = f.surface() else {
+                continue;
+            };
+            let mut n = pl.normal();
+            if !f.orientation() {
+                n = -n;
+            }
+            let c = n.dot(z);
+            if (c.abs() - 1.0).abs() > 1e-9 {
+                continue;
+            }
+            let (mut min, mut max) = ([f64::INFINITY; 2], [f64::NEG_INFINITY; 2]);
+            for w in f.boundaries() {
+                for e in w.edge_iter() {
+                    let cv = e.curve();
+                    let (t0, t1) = cv.range_tuple();
+                    for i in 0..=16 {
+                        let p = cv.subs(t0 + (t1 - t0) * i as f64 / 16.0);
+                        let d = p - o;
+                        let (u, v) = (d.dot(x), d.dot(y));
+                        min = [min[0].min(u), min[1].min(v)];
+                        max = [max[0].max(u), max[1].max(v)];
+                    }
+                }
+            }
+            if !min[0].is_finite() {
+                continue;
+            }
+            out.push(ParallelFace {
+                height: (pl.origin() - o).dot(z),
+                facing: c.signum(),
+                min,
+                max,
+            });
+        }
+        out.sort_by(|a, b| a.height.total_cmp(&b.height));
+        out
+    })
+}
+
 /// An inner boundary loop (hole outline) of a planar face perpendicular to Z.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InnerLoop {

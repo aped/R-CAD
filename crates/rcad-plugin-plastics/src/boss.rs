@@ -23,11 +23,11 @@
 //!   of `mate_hole_diameter` through the mate body and a counterbore of
 //!   `cbore_diameter` × `cbore_depth` from its outside face.
 //!
-//! Not supported (refused or absent, stated): root/tip fillets, drafted
-//! ribs, countersinks, alignment steps, a fastener component.
+//! Not supported (refused or absent, stated): ribs on a drafted shank
+//! (cone/plane joins), root/tip fillets, drafted ribs, countersinks, alignment steps, a fastener component.
 use crate::util::{EPS, SINK, invalid, placement_points, prism, standing, unsupported};
 use crate::{choice, input, param};
-use rcad_plugin::geom::{dot, next_below};
+use rcad_plugin::geom::{back_below_over, dot, footprint_of, next_below_over};
 use rcad_plugin::schema::FeatureSchema;
 use rcad_plugin::{BuildRequest, Frame, InputKind, Mode, Op, ParamKind, PluginError, Profile};
 
@@ -211,20 +211,6 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
         p("hole_draft_deg")?.to_radians(),
     );
     let hole = req.choice("hole")?;
-    // Base: the face the shank stands on.
-    let base = next_below(&s.parallel, EPS, 0.0).ok_or_else(|| {
-        invalid(
-            F,
-            "no face of the body at or below the sketch plane faces it",
-        )
-    })?;
-    let bottom = s
-        .parallel
-        .iter()
-        .filter(|q| q.height < base - EPS && q.facing < 0.0)
-        .map(|q| q.height)
-        .fold(None, |m: Option<f64>, x| Some(m.map_or(x, |m| m.max(x))));
-    let top = base + h;
     let top_d = d - 2.0 * h * da.tan();
     if top_d <= hd + EPS && hole != "none" {
         return Err(invalid(
@@ -243,6 +229,13 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
         p("rib_tip_height")?,
     );
     if ribs > 0 {
+        if da > 0.0 {
+            return Err(unsupported(
+                F,
+                "gusset ribs on a drafted shank are not supported (the kernel cannot join planar \
+                 ribs to a cone); set draft_deg to 0 or rib_count to 0",
+            ));
+        }
         if rl <= d / 2.0 + EPS {
             return Err(invalid(
                 F,
@@ -255,15 +248,6 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
         if rt >= d {
             return Err(invalid(F, "rib_thickness must be less than the diameter"));
         }
-        match bottom {
-            Some(b) if base - b > 2.0 * SINK => {}
-            _ => {
-                return Err(unsupported(
-                    F,
-                    format!("ribs sink {SINK} mm into the base; the material under it is too thin"),
-                ));
-            }
-        }
     }
     let mate = if req.has("mate") {
         Some(req.face("mate")?)
@@ -273,6 +257,27 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
     let mut ops = Vec::new();
     for (i, pt) in pts.iter().enumerate() {
         let id = 32 * i as u32;
+        // Base: the nearest face at or below the sketch plane facing it under
+        // this boss; bottom: the outside face under that.
+        let reach = if ribs > 0 { rl.max(d / 2.0) } else { d / 2.0 };
+        let fp = footprint_of(&[*pt], d / 2.0);
+        let base = next_below_over(&s.parallel, EPS, 0.0, &fp).ok_or_else(|| {
+            invalid(
+                F,
+                format!(
+                    "boss {}: no face of the body at or below the sketch plane faces it",
+                    i + 1
+                ),
+            )
+        })?;
+        let bottom = back_below_over(&s.parallel, base, EPS, &footprint_of(&[*pt], reach));
+        if ribs > 0 && !bottom.is_some_and(|b| base - b > 2.0 * SINK) {
+            return Err(unsupported(
+                F,
+                format!("ribs sink {SINK} mm into the base; the material under it is too thin"),
+            ));
+        }
+        let top = base + h;
         let at = s.frame.at(*pt).offset(base);
         let lbl = |w: &str| format!("boss {}: {w}", i + 1);
         ops.push(prism(
@@ -418,18 +423,14 @@ fn mate_ops(
         ));
     }
     // The outside face of the mate body (facing away from the bosses).
-    let out = m
-        .parallel
-        .iter()
-        .filter(|q| q.facing < 0.0 && q.height < -EPS)
-        .map(|q| q.height)
-        .fold(None, |a: Option<f64>, x| Some(a.map_or(x, |a| a.max(x))))
-        .ok_or_else(|| {
+    let out = back_below_over(&m.parallel, 0.0, EPS, &footprint_of(&[uv], mh / 2.0)).ok_or_else(
+        || {
             unsupported(
                 F,
                 "the mate body has no outside face parallel to the mating face",
             )
-        })?;
+        },
+    )?;
     let at = m.frame.at(uv);
     let lbl = |w: &str| format!("boss {} (mate): {w}", i + 1);
     let c = |r: f64| Profile::Circle {

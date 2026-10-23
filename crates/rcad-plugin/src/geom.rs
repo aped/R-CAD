@@ -356,10 +356,83 @@ pub struct FaceGeom {
 /// faces up the reference normal, e.g. a floor seen from above; `-1`: it
 /// faces down, e.g. a ceiling). Faces in one plane with the same facing
 /// appear once.
+///
+/// `footprint` is the bounding box `[min, max]` of the face's boundary in
+/// the reference plane's coordinates (each face is listed on its own), so
+/// "to next" can be limited to faces under a tool.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ParallelPlane {
     pub height: f64,
     pub facing: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub footprint: Option<[[f64; 2]; 2]>,
+}
+
+/// Plane-coordinate box `[min, max]`.
+pub type Footprint = [[f64; 2]; 2];
+
+fn overlaps(p: &ParallelPlane, over: Option<&Footprint>) -> bool {
+    match (p.footprint, over) {
+        (Some(f), Some(o)) => {
+            f[0][0] <= o[1][0] && o[0][0] <= f[1][0] && f[0][1] <= o[1][1] && o[0][1] <= f[1][1]
+        }
+        _ => true,
+    }
+}
+
+/// [`next_below`] among the faces whose footprint overlaps `over`.
+pub fn next_below_over(
+    planes: &[ParallelPlane],
+    h: f64,
+    eps: f64,
+    over: &Footprint,
+) -> Option<f64> {
+    planes
+        .iter()
+        .filter(|p| p.facing > 0.0 && p.height < h - eps && overlaps(p, Some(over)))
+        .map(|p| p.height)
+        .fold(None, |m: Option<f64>, x| Some(m.map_or(x, |m| m.max(x))))
+}
+
+/// [`next_above`] among the faces whose footprint overlaps `over`.
+pub fn next_above_over(
+    planes: &[ParallelPlane],
+    h: f64,
+    eps: f64,
+    over: &Footprint,
+) -> Option<f64> {
+    planes
+        .iter()
+        .filter(|p| p.facing < 0.0 && p.height > h + eps && overlaps(p, Some(over)))
+        .map(|p| p.height)
+        .fold(None, |m: Option<f64>, x| Some(m.map_or(x, |m| m.min(x))))
+}
+
+/// The nearest face below `h` facing away (down the reference normal) whose
+/// footprint overlaps `over`: e.g. the outside of a floor under a tool.
+pub fn back_below_over(
+    planes: &[ParallelPlane],
+    h: f64,
+    eps: f64,
+    over: &Footprint,
+) -> Option<f64> {
+    planes
+        .iter()
+        .filter(|p| p.facing < 0.0 && p.height < h - eps && overlaps(p, Some(over)))
+        .map(|p| p.height)
+        .fold(None, |m: Option<f64>, x| Some(m.map_or(x, |m| m.max(x))))
+}
+
+/// Bounding box of points, grown by `r`.
+pub fn footprint_of(points: &[[f64; 2]], r: f64) -> Footprint {
+    let mut f = [[f64::INFINITY; 2], [f64::NEG_INFINITY; 2]];
+    for p in points {
+        for i in 0..2 {
+            f[0][i] = f[0][i].min(p[i] - r);
+            f[1][i] = f[1][i].max(p[i] + r);
+        }
+    }
+    f
 }
 
 /// The nearest parallel plane below height `h` (strictly, by more than

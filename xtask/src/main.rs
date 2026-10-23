@@ -114,6 +114,7 @@ const EXAMPLES: &[(&str, &str)] = &[
     ("everyday knob", "everyday_knob_workflow.json"),
     ("threaded pair", "threaded_pair_workflow.json"),
     ("split bar", "split_bar_workflow.json"),
+    ("plastic enclosure", "plastic_enclosure_workflow.json"),
 ];
 
 /// Groups of stages, selectable with `--stage`; always run in this order.

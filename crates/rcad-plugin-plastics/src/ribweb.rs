@@ -18,7 +18,7 @@
 use crate::util::SINK;
 use crate::util::{EPS, invalid, prism, unsupported};
 use crate::{choice, input, param};
-use rcad_plugin::geom::{add, cross, next_above, next_below, scale};
+use rcad_plugin::geom::{add, cross, footprint_of, next_above_over, next_below_over, scale};
 use rcad_plugin::schema::FeatureSchema;
 use rcad_plugin::{
     BuildRequest, Curve, Frame, InputKind, Mode, Op, ParamKind, PluginError, Profile, SketchGeom,
@@ -300,26 +300,30 @@ pub fn build_web(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
     );
     let sym = req.choice("thickness_side")? == "symmetric";
     let up = req.choice("direction")? == "normal";
-    let depth = match req.choice("extent")? {
-        "to_next" => {
-            let next = if up {
-                next_above(&s.parallel, 0.0, EPS)
-            } else {
-                next_below(&s.parallel, 0.0, EPS).map(|h| -h)
-            };
-            // Sunk into the face it meets, so the web's end is not
-            // coplanar with it (inside the material behind that face).
-            next.ok_or_else(|| {
-                invalid(f, "to next: no face of the sketch's body faces the sketch plane in that direction")
-            })? + SINK
-        }
-        _ => req.param("depth")?,
-    };
+    let to_next = req.choice("extent")? == "to_next";
     let mut ops = Vec::new();
     for (i, (pa, pb, ea, eb)) in lines(f, s, t)?.into_iter().enumerate() {
         let l = line(f, pa, pb, ea, eb)?;
         let label = format!("web line {}", i + 1);
         let (w0, w1) = if sym { (-t / 2.0, t / 2.0) } else { (0.0, t) };
+        let depth = if to_next {
+            // The nearest face facing the sketch plane under this line,
+            // sunk into it so the web's end is not coplanar with it.
+            let fp = footprint_of(&[pa, pb], t);
+            let next = if up {
+                next_above_over(&s.parallel, 0.0, EPS, &fp)
+            } else {
+                next_below_over(&s.parallel, 0.0, EPS, &fp).map(|h| -h)
+            };
+            next.ok_or_else(|| {
+                invalid(
+                    f,
+                    format!("to next: no face of the sketch's body under web line {} faces the sketch plane", i + 1),
+                )
+            })? + SINK
+        } else {
+            req.param("depth")?
+        };
         if a == 0.0 {
             let span = if up { (0.0, depth) } else { (-depth, 0.0) };
             ops.push(prism(

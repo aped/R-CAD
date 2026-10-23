@@ -139,3 +139,55 @@ fn unsupported_rib_input_is_refused() {
     assert!(m.contains("draft closes"), "{m}");
     assert_close(vol(&s, BodyId(1)), BOX, 1e-9, "unchanged");
 }
+
+#[test]
+fn to_next_only_sees_faces_under_the_web() {
+    let (mut s, e) = open_box();
+    // A 6×6 block 5 high on the floor at x = 15 (its top, z = 7, faces up
+    // but is not under the web at x = 0).
+    let blk = ok(
+        &mut s,
+        Command::CreateSketch {
+            name: None,
+            plane: SketchPlane::Offset {
+                base: rcad_document::PlaneBase::Face(FaceRef {
+                    feature: e,
+                    role: FaceRole::ExtrudeEndCap,
+                }),
+                distance: -18.0,
+                angle: 0.0,
+            },
+            template: SketchTemplate::CenteredRectangle {
+                width: 6.0,
+                height: 6.0,
+                center: Some([15.0, 0.0]),
+            },
+        },
+    )
+    .feature
+    .unwrap();
+    let mut c = Command::extrude(None, blk, 5.0);
+    if let Command::Extrude { op, target, .. } = &mut c {
+        *op = rcad_commands::ExtrudeOp::Join;
+        *target = Some(BodyId(1));
+    }
+    ok(&mut s, c);
+    let before = vol(&s, BodyId(1));
+    assert_close(before, BOX + 180.0, 1e-6, "block");
+    let sk = line_sketch(&mut s, end_cap(e), &[([0.0, -19.0], [0.0, 19.0])]);
+    ok(
+        &mut s,
+        feature(
+            "web",
+            &[("sketch", sketch_in(sk))],
+            &[("thickness", 2.0), ("draft_deg", 0.0)],
+            &[("direction", "flip"), ("extent", "to_next")],
+        ),
+    );
+    assert_close(
+        vol(&s, BodyId(1)),
+        before + 36.0 * 2.0 * 18.0,
+        1e-6,
+        "web to the floor",
+    );
+}

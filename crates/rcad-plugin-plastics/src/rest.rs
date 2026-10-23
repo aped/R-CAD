@@ -16,7 +16,7 @@
 //! per-side drafts.
 use crate::util::{EPS, closed_profiles, invalid, prism};
 use crate::{choice, input, param};
-use rcad_plugin::geom::next_below;
+use rcad_plugin::geom::{Footprint, back_below_over, footprint_of, next_below_over};
 use rcad_plugin::schema::FeatureSchema;
 use rcad_plugin::{BuildRequest, InputKind, Mode, Op, ParamKind, PluginError};
 
@@ -71,6 +71,18 @@ pub fn schema() -> FeatureSchema {
     }
 }
 
+fn profile_footprint(p: &rcad_plugin::Profile) -> Footprint {
+    use rcad_plugin::Profile as P;
+    match p {
+        P::Circle { center, radius } => footprint_of(&[*center], *radius),
+        P::Polygon { points } => footprint_of(points, 0.0),
+        P::Loop { segments } => {
+            let pts: Vec<[f64; 2]> = segments.iter().map(|s| s.start()).collect();
+            footprint_of(&pts, 0.0)
+        }
+    }
+}
+
 pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
     let s = req.sketch("sketch")?;
     if s.body.is_none() {
@@ -84,35 +96,37 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
         req.param("offset")?,
         req.param("draft_deg")?.to_radians(),
     );
-    // Floor height below the sketch plane (< 0), and the outside face under it.
-    let floor = match req.choice("extent")? {
-        "to_next" => next_below(&s.parallel, 0.0, EPS).ok_or_else(|| {
-            invalid(
-                F,
-                "to next: no face of the body below the sketch plane faces it",
-            )
-        })?,
-        _ => -req.param("depth")?,
-    };
-    let bottom = s
-        .parallel
-        .iter()
-        .filter(|q| q.facing < 0.0 && q.height < floor - EPS)
-        .map(|q| q.height)
-        .fold(None, |m: Option<f64>, x| Some(m.map_or(x, |m| m.max(x))))
-        .ok_or_else(|| invalid(F, "no outside face of the body under the floor"))?;
-    let top = o;
-    let rise = top - floor;
-    if rise <= t + EPS {
-        return Err(invalid(
-            F,
-            format!("the top is {rise:.3} mm above the floor; it must be more than the thickness"),
-        ));
-    }
-    let base = s.frame.offset(floor);
     let mut ops = Vec::new();
     for (k, p) in closed_profiles(F, s)?.into_iter().enumerate() {
         let id = 4 * k as u32;
+        // Floor height below the sketch plane (< 0) under this profile, and
+        // the outside face under it.
+        let fp = profile_footprint(&p);
+        let floor = match req.choice("extent")? {
+            "to_next" => next_below_over(&s.parallel, 0.0, EPS, &fp).ok_or_else(|| {
+                invalid(
+                    F,
+                    format!(
+                        "to next: no face of the body under rest {} faces the sketch plane",
+                        k + 1
+                    ),
+                )
+            })?,
+            _ => -req.param("depth")?,
+        };
+        let bottom = back_below_over(&s.parallel, floor, EPS, &fp)
+            .ok_or_else(|| invalid(F, "no outside face of the body under the floor"))?;
+        let top = o;
+        let rise = top - floor;
+        if rise <= t + EPS {
+            return Err(invalid(
+                F,
+                format!(
+                    "the top is {rise:.3} mm above the floor; it must be more than the thickness"
+                ),
+            ));
+        }
+        let base = s.frame.offset(floor);
         let lbl = |w: &str| format!("rest {}: {w}", k + 1);
         // Solid: exact at the top, `rise·tan(a)` wider at the floor.
         let solid = p.offset(rise * a.tan()).map_err(|e| invalid(F, e))?;

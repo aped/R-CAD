@@ -1,0 +1,402 @@
+[
+  {
+    "cmd": "new_document"
+  },
+  {
+    "cmd": "create_sketch",
+    "name": "Base outline",
+    "plane": "WorldXY",
+    "template": "centered_rectangle",
+    "width": 80.0,
+    "height": 50.0
+  },
+  {
+    "cmd": "extrude",
+    "body_name": "Base",
+    "distance": 25.0,
+    "sketch": 1
+  },
+  {
+    "cmd": "shell_face",
+    "face": {
+      "feature": 2,
+      "role": "ExtrudeEndCap"
+    },
+    "thickness": 2.0
+  },
+  {
+    "cmd": "create_sketch",
+    "name": "Lid outline",
+    "plane": {
+      "Offset": {
+        "base": "WorldXY",
+        "distance": 25.0
+      }
+    },
+    "template": "centered_rectangle",
+    "width": 80.0,
+    "height": 50.0
+  },
+  {
+    "cmd": "extrude",
+    "body_name": "Lid",
+    "distance": 6.0,
+    "sketch": 4
+  },
+  {
+    "cmd": "shell_face",
+    "face": {
+      "feature": 5,
+      "role": "ExtrudeStartCap"
+    },
+    "thickness": 2.0
+  },
+  {
+    "cmd": "set_plugin_data",
+    "plugin": "plastics",
+    "data": {
+      "rules": [
+        {
+          "name": "ABS",
+          "material": "abs",
+          "values": {
+            "T": "2 mm",
+            "DA": "1"
+          }
+        }
+      ],
+      "bodies": {
+        "1": "ABS",
+        "2": "ABS"
+      }
+    }
+  },
+  {
+    "cmd": "plugin_feature",
+    "plugin": "plastics",
+    "feature": "lip",
+    "name": "Lip and groove",
+    "inputs": {
+      "face": {
+        "kind": "face",
+        "plane": {
+          "Face": {
+            "feature": 2,
+            "role": "ExtrudeEndCap"
+          }
+        }
+      },
+      "mate": {
+        "kind": "face",
+        "plane": {
+          "Face": {
+            "feature": 5,
+            "role": "ExtrudeStartCap"
+          }
+        }
+      }
+    },
+    "choices": {
+      "type": "lip_and_groove",
+      "position": "outer"
+    }
+  },
+  {
+    "cmd": "create_sketch",
+    "name": "Boss points",
+    "plane": {
+      "Offset": {
+        "base": {
+          "Face": {
+            "feature": 2,
+            "role": "ExtrudeEndCap"
+          }
+        },
+        "distance": -23.0
+      }
+    },
+    "template": "custom",
+    "sketch": {
+      "points": [
+        {
+          "id": 0,
+          "x": -32.0,
+          "y": -17.0
+        },
+        {
+          "id": 1,
+          "x": 32.0,
+          "y": -17.0
+        },
+        {
+          "id": 2,
+          "x": 32.0,
+          "y": 17.0
+        },
+        {
+          "id": 3,
+          "x": -32.0,
+          "y": 17.0
+        }
+      ],
+      "entities": [],
+      "constraints": [
+        {
+          "FixedPoint": {
+            "p": 0,
+            "x": -32.0,
+            "y": -17.0
+          }
+        },
+        {
+          "FixedPoint": {
+            "p": 1,
+            "x": 32.0,
+            "y": -17.0
+          }
+        },
+        {
+          "FixedPoint": {
+            "p": 2,
+            "x": 32.0,
+            "y": 17.0
+          }
+        },
+        {
+          "FixedPoint": {
+            "p": 3,
+            "x": -32.0,
+            "y": 17.0
+          }
+        }
+      ]
+    }
+  },
+  {
+    "cmd": "plugin_feature",
+    "plugin": "plastics",
+    "feature": "boss",
+    "name": "Screw bosses",
+    "inputs": {
+      "sketch": {
+        "kind": "sketch",
+        "sketch": 8
+      },
+      "mate": {
+        "kind": "face",
+        "plane": {
+          "Offset": {
+            "base": {
+              "Face": {
+                "feature": 5,
+                "role": "ExtrudeStartCap"
+              }
+            },
+            "distance": -4.0
+          }
+        }
+      }
+    },
+    "params": {
+      "height": 20.0,
+      "draft_deg": 0.0,
+      "hole_depth": 8.0,
+      "rib_count": 4,
+      "rib_length": 7.0,
+      "rib_height": 12.0,
+      "rib_tip_height": 3.0,
+      "rib_angle_deg": 45.0,
+      "cbore_depth": 1.0
+    }
+  },
+  {
+    "cmd": "create_sketch",
+    "name": "Web line",
+    "plane": {
+      "Offset": {
+        "base": {
+          "Face": {
+            "feature": 2,
+            "role": "ExtrudeEndCap"
+          }
+        },
+        "distance": -10.0
+      }
+    },
+    "template": "custom",
+    "sketch": {
+      "points": [
+        {
+          "id": 0,
+          "x": 0.0,
+          "y": -24.0
+        },
+        {
+          "id": 1,
+          "x": 0.0,
+          "y": 24.0
+        }
+      ],
+      "entities": [
+        {
+          "Line": {
+            "a": 0,
+            "b": 1,
+            "id": 1
+          }
+        }
+      ],
+      "constraints": [
+        {
+          "FixedPoint": {
+            "p": 0,
+            "x": 0.0,
+            "y": -24.0
+          }
+        },
+        {
+          "FixedPoint": {
+            "p": 1,
+            "x": 0.0,
+            "y": 24.0
+          }
+        }
+      ]
+    }
+  },
+  {
+    "cmd": "plugin_feature",
+    "plugin": "plastics",
+    "feature": "web",
+    "name": "Stiffening web",
+    "inputs": {
+      "sketch": {
+        "kind": "sketch",
+        "sketch": 10
+      }
+    },
+    "choices": {
+      "direction": "flip",
+      "extent": "to_next"
+    }
+  },
+  {
+    "cmd": "create_sketch",
+    "name": "Rest outline",
+    "plane": {
+      "Offset": {
+        "base": {
+          "Face": {
+            "feature": 2,
+            "role": "ExtrudeEndCap"
+          }
+        },
+        "distance": -15.0
+      }
+    },
+    "template": "centered_rectangle",
+    "width": 16.0,
+    "height": 10.0,
+    "center": [
+      18.0,
+      0.0
+    ]
+  },
+  {
+    "cmd": "plugin_feature",
+    "plugin": "plastics",
+    "feature": "rest",
+    "name": "PCB rest",
+    "inputs": {
+      "sketch": {
+        "kind": "sketch",
+        "sketch": 12
+      }
+    }
+  },
+  {
+    "cmd": "create_sketch",
+    "name": "Snap points",
+    "plane": {
+      "Offset": {
+        "base": {
+          "Face": {
+            "feature": 5,
+            "role": "ExtrudeStartCap"
+          }
+        },
+        "distance": -4.0
+      }
+    },
+    "template": "custom",
+    "sketch": {
+      "points": [
+        {
+          "id": 0,
+          "x": -20.0,
+          "y": -21.5
+        },
+        {
+          "id": 1,
+          "x": 20.0,
+          "y": -21.5
+        }
+      ],
+      "entities": [],
+      "constraints": [
+        {
+          "FixedPoint": {
+            "p": 0,
+            "x": -20.0,
+            "y": -21.5
+          }
+        },
+        {
+          "FixedPoint": {
+            "p": 1,
+            "x": 20.0,
+            "y": -21.5
+          }
+        }
+      ]
+    }
+  },
+  {
+    "cmd": "plugin_feature",
+    "plugin": "plastics",
+    "feature": "snap_fit",
+    "name": "Snap hook",
+    "inputs": {
+      "sketch": {
+        "kind": "sketch",
+        "sketch": 14
+      },
+      "mate": {
+        "kind": "body",
+        "body": 1
+      }
+    },
+    "params": {
+      "width": 6.0,
+      "rotation_deg": -90.0
+    },
+    "choices": {
+      "type": "hook_and_groove"
+    }
+  },
+  {
+    "cmd": "run_plugin_analysis",
+    "plugin": "plastics",
+    "analysis": "design_advice",
+    "inputs": {
+      "body": {
+        "kind": "body",
+        "body": 1
+      }
+    }
+  },
+  {
+    "cmd": "save",
+    "path": "examples/plastic_enclosure.rcad.json"
+  }
+]

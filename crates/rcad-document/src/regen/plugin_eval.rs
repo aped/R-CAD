@@ -28,24 +28,18 @@ fn plugin_profile(p: &SketchProfile) -> Option<rp::Profile> {
     rp::Profile::from_sketch(p)
 }
 
-/// Planar faces of `body` parallel to `frame` (exact heights along its z).
-fn parallel_planes(body: &Body, frame: &Frame) -> Vec<rp::ParallelPlane> {
-    let mut v: Vec<rp::ParallelPlane> = k::face_planes(body)
-        .iter()
-        .filter_map(|p| {
-            let c = dot(p.normal, frame.z);
-            ((c.abs() - 1.0).abs() < 1e-9).then(|| rp::ParallelPlane {
-                height: dot(sub(p.point, frame.origin), frame.z),
-                facing: c.signum(),
-            })
+/// Planar faces of `body` parallel to `frame` (exact heights along its z,
+/// footprints in its plane coordinates).
+fn parallel_planes(id: FeatureId, body: &Body, frame: &Frame) -> Result<Vec<rp::ParallelPlane>> {
+    Ok(k::parallel_faces(body, frame)
+        .map_err(kernel(id))?
+        .into_iter()
+        .map(|f| rp::ParallelPlane {
+            height: f.height,
+            facing: f.facing,
+            footprint: Some([f.min, f.max]),
         })
-        .collect();
-    v.sort_by(|a, b| {
-        a.height
-            .total_cmp(&b.height)
-            .then(a.facing.total_cmp(&b.facing))
-    });
-    v
+        .collect())
 }
 
 /// A resolved placement face.
@@ -67,7 +61,7 @@ fn face_geom(id: FeatureId, frame: &Frame, body: BodyId, st: &Snapshot) -> Resul
         body: body.0,
         loops,
         body_span: [lo, hi],
-        parallel: parallel_planes(&t, frame),
+        parallel: parallel_planes(id, &t, frame)?,
     })
 }
 
@@ -132,10 +126,10 @@ fn sketch_geom(id: FeatureId, sketch: FeatureId, st: &Snapshot) -> Result<rp::Sk
         .map(|p| [p.x, p.y])
         .collect();
     let body = so_face_body(st, sketch);
-    let parallel = body
-        .and_then(|b| brep_target(st, id, BodyId(b)).ok())
-        .map(|t| parallel_planes(&t, &so.frame))
-        .unwrap_or_default();
+    let parallel = match body {
+        Some(b) => parallel_planes(id, &brep_target(st, id, BodyId(b))?, &so.frame)?,
+        None => vec![],
+    };
     Ok(rp::SketchGeom {
         frame: to_plugin_frame(&so.frame),
         curves,
@@ -344,10 +338,14 @@ pub(super) fn eval_plugin(
         // themselves), so it gets no start face; its direction points into
         // the material, so only its far end is moved off a coplanar face.
         let plane_side = k::coplanar_face_side(&t, &frame).map_err(kernel(id))?;
+        // A Join counts as on a face only when its profile lies inside a
+        // face of that plane (not when an unrelated face merely shares it).
         let (side, dir) = if removes {
             (None, plane_side.map_or(1.0, |s| -s))
         } else {
-            (plane_side, 1.0)
+            let on = plane_side.is_some()
+                && k::profile_within_face(&t, &frame, &to_kernel(&prof)).map_err(kernel(id))?;
+            (plane_side.filter(|_| on), 1.0)
         };
         let tool = ExtrudeOut {
             start: frame,

@@ -13,7 +13,7 @@
 //! concentric arcs, mitred corners). Fusion's edge-chain selection, face
 //! guide, extents and trapezoidal sections are not modelled: the rim face
 //! stands for the edge chain, and sections are rectangular.
-use crate::util::{EPS, invalid, prism, unsupported};
+use crate::util::{EPS, SINK, invalid, prism, unsupported};
 use crate::{choice, input, param};
 use rcad_plugin::schema::FeatureSchema;
 use rcad_plugin::{BuildRequest, FaceGeom, InputKind, Mode, Op, ParamKind, PluginError, Profile};
@@ -166,7 +166,10 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
             face.frame,
             outer,
             vec![hole],
-            (0.0, h),
+            // Sunk into the rim (like every plastics tool standing on a
+            // face), so the band is joined by the general checked boolean
+            // also when the body is no longer prismatic under the rim.
+            (-SINK, h),
             0.0,
             Mode::Join,
             "lip".into(),

@@ -54,9 +54,9 @@ pub use fillet::{
 };
 pub use loft::{loft, loft_sections};
 pub use measure::{
-    Bounds, FacePlane, InnerLoop, Measurements, VolumeMethod, VolumeProperties, VolumeResult,
-    face_count, face_planes, measure, mesh_volume_properties, planar_faces_on, volume_properties,
-    z_face_inner_loops,
+    Bounds, FacePlane, InnerLoop, Measurements, ParallelFace, VolumeMethod, VolumeProperties,
+    VolumeResult, face_count, face_planes, measure, mesh_volume_properties, parallel_faces,
+    planar_faces_on, volume_properties, z_face_inner_loops,
 };
 pub use measure::{FacePairMeasure, PARALLEL_SIN, face_geometry, measure_face_pair};
 pub use mesh::{

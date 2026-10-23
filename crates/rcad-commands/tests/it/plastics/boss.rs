@@ -254,3 +254,18 @@ fn invalid_bosses_are_refused_and_leave_the_document_unchanged() {
     assert!(m.contains("must lie on a face"), "{m}");
     assert_close(vol(&s, BodyId(1)), before, 1e-12, "unchanged");
 }
+
+#[test]
+fn ribs_on_a_drafted_shank_are_refused_by_name() {
+    let (mut s, _, sk) = setup();
+    let m = err(
+        &mut s,
+        feature(
+            "boss",
+            &[("sketch", sketch_in(sk))],
+            &[("draft_deg", 1.0), ("rib_count", 4.0)],
+            &[],
+        ),
+    );
+    assert!(m.contains("drafted shank"), "{m}");
+}
