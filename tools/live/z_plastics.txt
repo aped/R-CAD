@@ -3,7 +3,7 @@
 # R / D keys, E), the ABS preset added in Manage Plastic Rules and stored
 # (rule parameters ABS_T, ...), the rule assigned to the plate (material ABS),
 # then Design Advice run on it (a 4 mm plate is above the default 3 mm
-# maximum: thickness alerts). Undo removes the assignment.
+# maximum: thickness alerts) and Draft Analysis shown as a colour map. Undo removes the assignment.
 clickw New
 wait_idle
 clickw Planes
@@ -44,6 +44,12 @@ clickw Design Advice…
 clickw Run analysis
 wait_idle
 expect last_reply.ok true
+shot
+clickw Draft Analysis…
+clickw Run analysis
+wait_idle
+expect last_reply.ok true
+clickw Show on model
 shot
 key ctrl+z
 wait_idle
