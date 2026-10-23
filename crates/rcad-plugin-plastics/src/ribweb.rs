@@ -100,6 +100,9 @@ pub fn web_schema() -> FeatureSchema {
 /// A line `(a, b)` and how far to extend it at `a` and at `b`.
 type Ends = ([f64; 2], [f64; 2], f64, f64);
 
+/// A sketch's lines and arcs with their operation ids.
+type Curves = (Vec<(u32, Ends)>, Vec<(u32, Arc)>);
+
 /// A sketch arc: centre, radius, start angle and counter-clockwise sweep.
 #[derive(Clone, Copy)]
 struct Arc {
@@ -147,11 +150,7 @@ impl Arc {
 /// thickness where another curve ends at the same point) and arcs, each with
 /// its index among the sketch's curves (the operation id). Circles are
 /// refused (a closed ring is a thin extrusion, not a rib).
-fn curves(
-    f: &str,
-    s: &SketchGeom,
-    t: f64,
-) -> Result<(Vec<(u32, Ends)>, Vec<(u32, Arc)>), PluginError> {
+fn curves(f: &str, s: &SketchGeom, t: f64) -> Result<Curves, PluginError> {
     let mut lines = Vec::new();
     let mut arcs = Vec::new();
     let mut ends: Vec<(usize, [f64; 2])> = Vec::new();
