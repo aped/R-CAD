@@ -40,12 +40,13 @@ A build is deterministic and has no access to the document beyond its request.
 
 ### Operations
 
-Three kinds:
+Four kinds:
 
 ```text
 Prism       { id, body, frame, profile, holes, from, to, taper_deg, mode, label }
 EdgeLoop    { id, of, end, blend: fillet|chamfer, size, holes, label }
 ReplaceFace { id, face, index, origin, normal, label }
+Countersink { id, body, at, axis, hole_diameter, diameter, angle_deg, label }
 ```
 
 - `EdgeLoop` rounds or bevels the outer edge loop (with `holes`, also the inner loops) of the end
@@ -55,6 +56,8 @@ ReplaceFace { id, face, index, origin, normal, label }
 - `ReplaceFace` replaces a planar face of a `face`/`faces` input by another plane, keeping
   topology: the kernel's exact face replacement (ADR 0010 preconditions), checked by probes.
   Used for drafts.
+- `Countersink` cones the entry of an existing round hole on the axis through `at`, from the
+  planar face through `at`: the kernel's exact countersink, built into the topology.
 
 Prism details:
 

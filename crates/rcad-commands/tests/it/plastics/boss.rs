@@ -363,3 +363,33 @@ fn alignment_steps_mate_out_with_in() {
         );
     }
 }
+
+#[test]
+fn a_countersunk_seat_is_an_exact_cone() {
+    let (mut s, _, sk) = setup();
+    let lid = plate(&mut s, offset_xy(14.0), 60.0, 40.0, 3.0);
+    let mate = SketchPlane::Face(start_cap(lid));
+    ok(
+        &mut s,
+        feature(
+            "boss",
+            &[("sketch", sketch_in(sk)), ("mate", face_in(mate))],
+            &[
+                ("height", 8.0),
+                ("draft_deg", 0.0),
+                ("gap", 0.5),
+                ("cbore_diameter", 6.0),
+            ],
+            &[("seat", "countersink")],
+        ),
+    );
+    // 90° cone from Ø6 at the lid's top down to the Ø3.4 hole: 1.3 deep.
+    let (big, r, hh) = (3.0f64, 1.7f64, 1.3f64);
+    let cone = PI * hh / 3.0 * (big * big + big * r + r * r) - PI * r * r * hh;
+    let lid_v = 60.0 * 40.0 * 3.0 + 2.0 * (PI * 9.0 * 1.5 - PI * r * r * 4.5) - 2.0 * cone;
+    assert_close(vol(&s, BodyId(2)), lid_v, 1e-6, "countersunk lid");
+    // Cone radius 3 - d at d below the top: r 2.5 is air at d 0.1, material at d 1.
+    let p = |rad: f64, z: f64| [15.0 + rad, 0.0, z];
+    let pr = probe(&s, BodyId(2), &[p(2.5, 16.9), p(2.5, 16.0)]);
+    assert_eq!(pr, [Some(false), Some(true)]);
+}

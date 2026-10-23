@@ -205,6 +205,15 @@ pub fn schema() -> FeatureSchema {
                 None,
             ),
             param(
+                "csink_angle_deg",
+                "Countersink angle",
+                Angle,
+                90.0,
+                Some((0.0, true)),
+                Some(179.0),
+                None,
+            ),
+            param(
                 "tip_radius",
                 "Tip fillet radius (0: none)",
                 Length,
@@ -217,6 +226,7 @@ pub fn schema() -> FeatureSchema {
         choices: vec![
             choice("hole", "Hole", &["pilot", "through", "none"]),
             choice("step", "Alignment step (side 1)", &["none", "out", "in"]),
+            choice("seat", "Mating screw seat", &["counterbore", "countersink"]),
         ],
     }
 }
@@ -629,7 +639,30 @@ fn mate_ops(
         Mode::Cut,
         lbl("clearance hole"),
     ));
-    if cdepth > 0.0 {
+    if req.choice("seat")? == "countersink" {
+        // A cone of `cbore_diameter` at the outside face (exact, kernel).
+        if cd <= mh + EPS {
+            return Err(invalid(
+                F,
+                "the countersink must be wider than the clearance hole",
+            ));
+        }
+        let a = p("csink_angle_deg")?;
+        let depth = (cd - mh) / 2.0 / (a / 2.0).to_radians().tan();
+        if depth >= -out + len - EPS {
+            return Err(invalid(F, "the countersink is deeper than the mating boss"));
+        }
+        ops.push(Op::Countersink {
+            id: id + 19,
+            body: "mate".into(),
+            at: m.frame.point(uv, out),
+            axis: m.frame.z,
+            hole_diameter: mh,
+            diameter: cd,
+            angle_deg: a,
+            label: lbl("countersink"),
+        });
+    } else if cdepth > 0.0 {
         if cd <= mh + EPS {
             return Err(invalid(
                 F,

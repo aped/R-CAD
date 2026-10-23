@@ -92,11 +92,12 @@ sketch and facing it.
 - ribs: `rib_count` (0–12), `rib_thickness` (1.2, *rule* `0.6*T`), `rib_length` (6, from the
   axis), `rib_height` (6), `rib_chamfer` (3), `rib_tip_height` (2), `rib_angle_deg` (0), `rib_total_deg` (360);
 - mating boss: `mate_diameter` (6), `mate_hole_diameter` (3.4), `cbore_diameter` (6),
-  `cbore_depth` (0: none), `gap` (*rule* `CL`);
+  `cbore_depth` (0: none), `csink_angle_deg` (90), `gap` (*rule* `CL`);
 - `tip_radius` (0: none): fillet of the shank top's outer edge;
 - alignment step: `step_diameter` (4.5), `step_depth` (1).
 
-**Choices:** `hole`: `pilot` | `through` | `none`; `step` (side 1): `none` | `out` | `in`.
+**Choices:** `hole`: `pilot` | `through` | `none`; `step` (side 1): `none` | `out` | `in`; `seat`: `counterbore` |
+`countersink`.
 
 **Result.** Per point:
 - a drafted shank from the base face (the nearest face at or below the sketch plane facing it)
@@ -111,7 +112,8 @@ sketch and facing it.
 With `mate`, the other body also gets:
 - a mating shank from the mate face to `gap` short of the shank top;
 - a clearance hole through the mate body;
-- a counterbore from its outside face.
+- a counterbore from its outside face, or with `seat` = `countersink` an exact cone of
+  `cbore_diameter` at `csink_angle_deg` (built into the topology by the kernel).
 
 **Refused:**
 - a hole not narrower than the drafted top;
@@ -130,7 +132,7 @@ kernel refuses it where gussets reach the top, the hole is within the radius of 
 shank is drafted.
 
 **Not modelled:** root fillets (the kernel blends convex cap loops, not the concave base edge),
-drafted ribs, countersinks, fastener components.
+drafted ribs, fastener components.
 
 ## Rib and Web
 

@@ -206,6 +206,22 @@ pub enum Op {
     /// replacement (docs/adr/0010: the face is a convex single loop of
     /// straight edges, its neighbours planes, one side edge per vertex; the
     /// result is checked by probes). Used for drafts of existing faces.
+    /// Exact countersink (cone of `diameter` at the entry, included angle
+    /// `angle_deg`) of the round hole of `hole_diameter` on the axis through
+    /// `at` along `axis`, entering from the planar face through `at`
+    /// perpendicular to the axis; on the body of input `body`. Built into
+    /// the topology by the kernel (no boolean), checked by probes.
+    Countersink {
+        id: u32,
+        body: String,
+        at: [f64; 3],
+        axis: [f64; 3],
+        hole_diameter: f64,
+        diameter: f64,
+        angle_deg: f64,
+        #[serde(default)]
+        label: String,
+    },
     ReplaceFace {
         id: u32,
         face: String,
@@ -468,6 +484,46 @@ pub fn check_ops(req: &BuildRequest, ops: &[Op]) -> Result<(), PluginError> {
     let mut ids = std::collections::BTreeSet::new();
     let mut prisms = std::collections::BTreeSet::new();
     for op in ops {
+        if let Op::Countersink {
+            id,
+            body,
+            at,
+            axis,
+            hole_diameter,
+            diameter,
+            angle_deg,
+            label,
+        } = op
+        {
+            let what = format!(
+                "{}: {}",
+                req.feature,
+                if label.is_empty() {
+                    "countersink"
+                } else {
+                    label
+                }
+            );
+            let bad = |m: &str| Err(PluginError::Failed(format!("{what}: {m}")));
+            if !ids.insert(*id) {
+                return bad("operation id repeated");
+            }
+            if target_body(req, body).is_none() {
+                return bad(&format!(
+                    "'{body}' is not a face, body or sketch-on-face input"
+                ));
+            }
+            if !at.iter().chain(axis).all(|v| v.is_finite())
+                || geom::norm(*axis) < 1e-12
+                || !(diameter > hole_diameter && *hole_diameter > 0.0)
+                || !(*angle_deg > 0.0 && *angle_deg < 180.0)
+            {
+                return bad(
+                    "needs a finite axis, diameter > hole diameter > 0 and an angle in (0, 180)",
+                );
+            }
+            continue;
+        }
         if let Op::ReplaceFace {
             id,
             face,

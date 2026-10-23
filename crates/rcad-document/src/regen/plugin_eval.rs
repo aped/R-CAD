@@ -316,6 +316,42 @@ pub(super) fn eval_plugin(
     }
     let mut tools = Vec::with_capacity(ops.len());
     for op in &ops {
+        if let rp::Op::Countersink {
+            body,
+            at,
+            axis,
+            hole_diameter,
+            diameter,
+            angle_deg,
+            label,
+            ..
+        } = op
+        {
+            let target =
+                BodyId(rp::target_body(&req, body).ok_or_else(|| {
+                    DocError::Validation(format!("{id}: {label}: no target body"))
+                })?);
+            let t = brep_target(st, id, target)?;
+            let out = k::countersink(
+                &t,
+                *at,
+                *axis,
+                *hole_diameter,
+                *diameter,
+                angle_deg.to_radians(),
+            )
+            .map_err(|e| match e {
+                k::KernelError::InvalidInput(m) => {
+                    DocError::ProductLimit(format!("{id}: {label}: {m}"))
+                }
+                other => DocError::Kernel {
+                    feature: id,
+                    detail: format!("{label}: {other}"),
+                },
+            })?;
+            replace_body(st, id, target, out);
+            continue;
+        }
         if let rp::Op::ReplaceFace {
             id: op_id,
             face,
