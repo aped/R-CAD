@@ -22,6 +22,12 @@ but no mass; totals over bodies are only reported when every listed body has a m
 | `asa` | ASA | 1.07 | 1.05–1.10 |
 | `pa12` | Nylon PA12 | 1.01 | 1.00–1.03 |
 | `tpu` | TPU 95A | 1.21 | 1.18–1.24 |
+| `pc` | Polycarbonate (PC) | 1.20 | 1.19–1.21 |
+| `pc_abs` | PC/ABS | 1.15 | 1.10–1.20 |
+| `pp` | Polypropylene (PP) | 0.905 | 0.90–0.91 |
+| `pa66` | Nylon PA66 | 1.14 | 1.13–1.15 |
+| `pom` | Acetal (POM) | 1.41 | 1.39–1.42 |
+| `hdpe` | HDPE | 0.955 | 0.94–0.97 |
 | `al6061` | Aluminium 6061 | 2.70 | 2.69–2.71 |
 | `steel` | Carbon steel | 7.85 | 7.80–7.87 |
 | `ss304` | Stainless steel 304 | 8.00 | 7.90–8.03 |

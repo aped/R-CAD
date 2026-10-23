@@ -299,3 +299,45 @@ fn a_feature_of_a_missing_plugin_fails_by_name_and_keeps_its_data() {
         serde_json::from_str(&std::fs::read_to_string(&out).unwrap()).unwrap();
     assert_eq!(a["document"]["features"], b["document"]["features"]);
 }
+
+#[test]
+fn every_preset_rule_assigns_a_catalog_material() {
+    for (name, mat, ..) in rcad_plugin_plastics::rules::PRESETS {
+        let (mut s, _) = open_box();
+        let rule = rcad_plugin_plastics::rules::Rule::preset(name).unwrap();
+        ok(
+            &mut s,
+            Command::SetPluginData(SetPluginDataCmd {
+                plugin: "plastics".into(),
+                data: json!({"rules": [rule], "bodies": {"1": name}}),
+            }),
+        );
+        let b = s.summary().bodies.into_iter().find(|b| b.id == BodyId(1)).unwrap();
+        assert_eq!(b.material.and_then(|m| m.catalog).as_deref(), *mat, "{name}");
+    }
+}
+
+#[test]
+fn redefining_a_plugin_feature_edits_choices_and_inputs_in_one_step() {
+    let (mut s, e) = open_box();
+    let f = web_cross(&mut s, e).feature.unwrap();
+    let mut kind = s.model().unwrap().document().feature(f).unwrap().kind.clone();
+    if let rcad_document::FeatureKind::Plugin { params, choices, .. } = &mut kind {
+        params.get_mut("thickness").unwrap().value = 4.0;
+        choices.insert("thickness_side".into(), "one_side".into());
+    }
+    ok(
+        &mut s,
+        Command::RedefineFeature {
+            feature: f,
+            kind: Box::new(kind),
+            name: None,
+            expressions: None,
+        },
+    );
+    assert_close(vol(&s, BodyId(1)), BOX + 56.0 * 4.0 * 18.0, 1e-6, "redefined web");
+    // One-sided: the web lies on the left of the line (+y), not across it.
+    assert_eq!(probe(&s, BodyId(1), &[[0.0, 3.5, 10.0], [0.0, -0.5, 10.0]]), [Some(true), Some(false)]);
+    ok(&mut s, Command::Undo);
+    assert_close(vol(&s, BodyId(1)), BOX + 56.0 * 2.0 * 18.0, 1e-6, "undone");
+}

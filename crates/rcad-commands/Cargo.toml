@@ -21,5 +21,6 @@ serde_json.workspace = true
 
 [dev-dependencies]
 rcad-document = { workspace = true, features = ["test-hooks"] }
+rcad-plugin-plastics.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true

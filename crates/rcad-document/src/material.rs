@@ -77,6 +77,42 @@ pub const CATALOG: &[CatalogEntry] = &[
         range: (1.18, 1.24),
     },
     CatalogEntry {
+        key: "pc",
+        name: "Polycarbonate (PC)",
+        density: 1.2,
+        range: (1.19, 1.21),
+    },
+    CatalogEntry {
+        key: "pc_abs",
+        name: "PC/ABS",
+        density: 1.15,
+        range: (1.10, 1.20),
+    },
+    CatalogEntry {
+        key: "pp",
+        name: "Polypropylene (PP)",
+        density: 0.905,
+        range: (0.90, 0.91),
+    },
+    CatalogEntry {
+        key: "pa66",
+        name: "Nylon PA66",
+        density: 1.14,
+        range: (1.13, 1.15),
+    },
+    CatalogEntry {
+        key: "pom",
+        name: "Acetal (POM)",
+        density: 1.41,
+        range: (1.39, 1.42),
+    },
+    CatalogEntry {
+        key: "hdpe",
+        name: "HDPE",
+        density: 0.955,
+        range: (0.94, 0.97),
+    },
+    CatalogEntry {
         key: "al6061",
         name: "Aluminium 6061",
         density: 2.70,
