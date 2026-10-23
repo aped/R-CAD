@@ -84,3 +84,52 @@ pub fn placement_points(s: &rcad_plugin::SketchGeom) -> Vec<[f64; 2]> {
     }
     out
 }
+
+/// Closed profiles of a sketch: its circles, and its lines chained end to
+/// end into closed polygons (each line used once). Arcs and open chains are
+/// refused with the reason.
+pub fn closed_profiles(f: &str, s: &rcad_plugin::SketchGeom) -> Result<Vec<Profile>, PluginError> {
+    use rcad_plugin::Curve;
+    let mut out = Vec::new();
+    let mut lines: Vec<([f64; 2], [f64; 2])> = Vec::new();
+    for c in &s.curves {
+        match *c {
+            Curve::Circle { center, radius } => out.push(Profile::Circle { center, radius }),
+            Curve::Line { a, b } => lines.push((a, b)),
+            Curve::Arc { .. } => {
+                return Err(unsupported(f, "profiles with arcs are not supported (circles and line loops are)"));
+            }
+        }
+    }
+    let same = |p: [f64; 2], q: [f64; 2]| (p[0] - q[0]).hypot(p[1] - q[1]) < EPS;
+    let mut used = vec![false; lines.len()];
+    for start in 0..lines.len() {
+        if used[start] {
+            continue;
+        }
+        used[start] = true;
+        let first = lines[start].0;
+        let mut pts = vec![first];
+        let mut at = lines[start].1;
+        loop {
+            if same(at, first) {
+                break;
+            }
+            pts.push(at);
+            let next = (0..lines.len()).find(|&j| !used[j] && (same(lines[j].0, at) || same(lines[j].1, at)));
+            let Some(j) = next else {
+                return Err(invalid(f, "the sketch lines do not form closed loops"));
+            };
+            used[j] = true;
+            at = if same(lines[j].0, at) { lines[j].1 } else { lines[j].0 };
+        }
+        if pts.len() < 3 {
+            return Err(invalid(f, "a closed loop needs at least three lines"));
+        }
+        out.push(Profile::Polygon { points: pts });
+    }
+    if out.is_empty() {
+        return Err(invalid(f, "the sketch has no closed profile"));
+    }
+    Ok(out)
+}
