@@ -32,6 +32,12 @@ use truck_modeling::*;
 /// curve must start/end within this distance of the boolean's vertices and its
 /// samples must lie this close to both surfaces.
 pub(crate) const REBUILD_TOL: f64 = 1.0e-7;
+/// Placement tolerance (mm) of the boolean's vertices: Truck places them within its
+/// own `TOLERANCE` (1e-6) of the surfaces (observed up to 6e-7 off a cylinder where
+/// gusset planes meet a boss). A rebuilt curve's ends must reach its vertices within
+/// this, and a straight ruling's segment between two vertices may keep this distance
+/// from the curved surface; curves built on both surfaces keep `REBUILD_TOL` there.
+pub(crate) const VERTEX_TOL: f64 = 1.0e-6;
 /// Agreement tolerance (mm) between points of the original intersection curve and the
 /// rebuilt curve. The original's points come from Truck's double projection, which
 /// stops at `truck_base::tolerance::TOLERANCE` (1e-6); this is ten times that.
@@ -191,8 +197,12 @@ pub(crate) fn exact_edge(
         return Err(unsupported("intersection with a non-NURBS surface"));
     };
     if !is_extrusion_along(ns, n) {
-        return plane_ruling_edge(ic, plane, other, p0, p1)
-            .map_err(|_| unsupported("curved face is not extruded along the plane normal"));
+        return plane_ruling_edge(ic, plane, other, p0, p1).map_err(|e| {
+            KernelError::InvalidInput(format!(
+                "exact intersection unsupported: curved face is not extruded along the plane \
+                     normal, and not a straight ruling of it ({e})"
+            ))
+        });
     }
     let full = generating_curve_on(ns, o, n)?;
     let t0 = full
@@ -212,7 +222,7 @@ pub(crate) fn exact_edge(
         sub.invert();
     }
     let (s0, s1) = sub.range_tuple();
-    if sub.subs(s0).distance(p0) > REBUILD_TOL || sub.subs(s1).distance(p1) > REBUILD_TOL {
+    if sub.subs(s0).distance(p0) > VERTEX_TOL || sub.subs(s1).distance(p1) > VERTEX_TOL {
         return Err(unsupported("rebuilt edge endpoints do not match vertices"));
     }
     // Interior samples must lie on both surfaces (i.e. on the exact intersection) ...
@@ -320,7 +330,7 @@ fn plane_revolution_edge(
     let arc = crate::step_in::geom::conic_arc(c, x, y, r, r, 0.0, sweep)
         .map_err(|e| unsupported(&e.0))?;
     let (s0, s1) = arc.range_tuple();
-    if arc.subs(s0).distance(p0) > REBUILD_TOL || arc.subs(s1).distance(p1) > REBUILD_TOL {
+    if arc.subs(s0).distance(p0) > VERTEX_TOL || arc.subs(s1).distance(p1) > VERTEX_TOL {
         return Err(unsupported("rebuilt arc endpoints do not match vertices"));
     }
     for k in 1..8 {
@@ -383,9 +393,17 @@ fn plane_ruling_edge(
     }
     for k in 1..8 {
         let p = p0 + d * (k as f64 / 8.0);
-        let on_surface = other
-            .search_parameter(p, None, 100)
-            .is_some_and(|(u, v)| other.subs(u, v).distance(p) < REBUILD_TOL);
+        // A NURBS surface is searched from its nearest grid sample: Newton
+        // from the default start misses points far round a closed surface
+        // (a cylinder), which made straight rulings look curved.
+        let on_surface = match other {
+            Surface::NurbsSurface(ns) => ns
+                .search_nearest_parameter(p, Some(grid_hint(ns, p)), 100)
+                .is_some_and(|(u, v)| ns.subs(u, v).distance(p) < VERTEX_TOL),
+            _ => other
+                .search_parameter(p, None, 100)
+                .is_some_and(|(u, v)| other.subs(u, v).distance(p) < VERTEX_TOL),
+        };
         if !on_surface {
             return Err(unsupported("segment does not lie on the curved surface"));
         }

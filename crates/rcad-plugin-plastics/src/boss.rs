@@ -15,7 +15,8 @@
 //!   (`hole` = pilot) or through the body (`through`), drafted by
 //!   `hole_draft_deg` (widening towards the top);
 //! * parts 2..: gusset ribs, a section from the axis to `rib_length` with
-//!   `rib_height` at the shank sloping to `rib_tip_height` at the end,
+//!   a flat top at `rib_height` chamfered over the last `rib_chamfer` down to
+//!   `rib_tip_height` (Fusion's chamfer profile),
 //!   `rib_thickness` thick, sunk [`SINK`] into the base, evenly over
 //!   `rib_total_deg` from `rib_angle_deg` (sketch x axis);
 //! * parts 16..18 (with a `mate` face): a mating shank of `mate_diameter`
@@ -98,6 +99,15 @@ pub fn schema() -> FeatureSchema {
             ),
             param("rib_height", "Rib height", Length, 6.0, pos, None, None),
             param(
+                "rib_chamfer",
+                "Rib chamfer length",
+                Length,
+                3.0,
+                nonneg,
+                None,
+                None,
+            ),
+            param(
                 "rib_tip_height",
                 "Rib height at its end",
                 Length,
@@ -174,6 +184,20 @@ pub fn schema() -> FeatureSchema {
     }
 }
 
+/// Gusset section in (radial, height): flat top `rh` from the axis to
+/// `rl - ch`, sloping to `rtip` at `rl`, sunk [`SINK`] below the base.
+fn rib_section(rl: f64, ch: f64, rh: f64, rtip: f64) -> Vec<[f64; 2]> {
+    let mut v = vec![[0.0, -SINK], [rl, -SINK], [rl, rtip]];
+    if ch > EPS && (rh - rtip).abs() > EPS {
+        v.push([rl - ch, rh]);
+    } else if (rh - rtip).abs() > EPS {
+        // No chamfer: a step down at the end.
+        v.push([rl, rh]);
+    }
+    v.push([0.0, rh]);
+    v
+}
+
 fn circle(r: f64) -> Profile {
     Profile::Circle {
         center: [0.0, 0.0],
@@ -245,6 +269,15 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
         if rh > h + EPS || rtip > rh + EPS {
             return Err(invalid(F, "ribs need rib_tip_height ≤ rib_height ≤ height"));
         }
+        // The chamfer starts outside the shank, so the rib's flat top meets the
+        // shank in circle arcs (exact edges; a sloped face would meet the
+        // cylinder in an ellipse the kernel keeps only as an implicit edge).
+        if rl - p("rib_chamfer")? < d / 2.0 - EPS {
+            return Err(invalid(
+                F,
+                "the rib chamfer must start outside the shank (rib_length - rib_chamfer >= diameter / 2)",
+            ));
+        }
         if rt >= d {
             return Err(invalid(F, "rib_thickness must be less than the diameter"));
         }
@@ -304,7 +337,7 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
             for k in 0..ribs {
                 let f = standing(&s.frame.offset(base), *pt, a0 + step * k as f64);
                 let section = Profile::Polygon {
-                    points: vec![[0.0, -SINK], [rl, -SINK], [rl, rtip], [0.0, rh]],
+                    points: rib_section(rl, p("rib_chamfer")?, rh, rtip),
                 };
                 ops.push(prism(
                     id + 2 + k as u32,

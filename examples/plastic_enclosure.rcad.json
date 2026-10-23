@@ -513,6 +513,10 @@
               "value": 45.0,
               "kind": "angle"
             },
+            "rib_chamfer": {
+              "value": 3.0,
+              "kind": "length"
+            },
             "rib_count": {
               "value": 4.0,
               "kind": "count"

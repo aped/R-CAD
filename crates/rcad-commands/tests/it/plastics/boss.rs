@@ -92,13 +92,14 @@ fn drafted_bosses_are_frustums_and_through_holes_pass_the_plate() {
 }
 
 /// Volume of one rib outside a shank of radius `r`: the slab |y| < t/2,
-/// x from the cylinder to `l`, height `h0` at the axis sloping linearly to
-/// `h1` at `l` (Simpson over y; the x integral is closed-form).
-fn rib_outside(r: f64, t: f64, l: f64, h0: f64, h1: f64) -> f64 {
-    let hx = |x: f64| h0 * x + (h1 - h0) * x * x / (2.0 * l);
+/// x from the cylinder to `l`, flat at `h0` up to `l - ch`, then sloping
+/// linearly to `h1` at `l` (Simpson over y; the x integral is closed-form;
+/// the slope starts outside the cylinder).
+fn rib_outside(r: f64, t: f64, l: f64, ch: f64, h0: f64, h1: f64) -> f64 {
+    let xs = l - ch;
     let f = |y: f64| {
         let a = (r * r - y * y).sqrt();
-        hx(l) - hx(a)
+        h0 * (xs - a) + ch * (h0 + h1) / 2.0
     };
     let n = 2000;
     let dy = t / n as f64;
@@ -131,10 +132,11 @@ fn gusset_ribs_add_their_sections_outside_the_shank() {
             &[],
         ),
     );
-    let rib = rib_outside(3.0, 1.2, 7.0, 6.0, 2.0);
+    let rib = rib_outside(3.0, 1.2, 7.0, 3.0, 6.0, 2.0);
     let want = PLATE + 2.0 * (PI * 9.0 * 8.0 + 4.0 * rib - PI * 1.25f64.powi(2) * 6.0);
     assert_close(vol(&s, BodyId(1)), want, 1e-6, "volume");
-    // A rib at 45°: inside near its root, outside past its sloped top.
+    // A rib at 45°: inside under its flat top, outside above its chamfer,
+    // inside under it.
     let d = std::f64::consts::FRAC_1_SQRT_2;
     let at = |x: f64, z: f64| [-15.0 + x * d, x * d, z];
     let pr = probe(
@@ -143,6 +145,16 @@ fn gusset_ribs_add_their_sections_outside_the_shank() {
         &[at(4.0, 4.0 + 3.0), at(6.5, 4.0 + 3.0), at(6.5, 4.0 + 2.0)],
     );
     assert_eq!(pr, [Some(true), Some(false), Some(true)]);
+    // Gusset/shank edges are exact (lines along the shank, arcs under the
+    // flat tops), so the body exports to STEP.
+    let dir = tempfile::tempdir().unwrap();
+    ok(
+        &mut s,
+        Command::ExportStep {
+            path: dir.path().join("boss.step"),
+            bodies: None,
+        },
+    );
 }
 
 #[test]
