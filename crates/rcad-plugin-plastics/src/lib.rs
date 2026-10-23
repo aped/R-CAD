@@ -76,7 +76,7 @@ fn manifest() -> Manifest {
         version: env!("CARGO_PKG_VERSION").into(),
         api_version: rcad_plugin::API_VERSION,
         description: "Plastic part design: rules, boss, rib, web, snap fit, lip/groove, rest, \
-                      design advice"
+                      design advice, draft, accessibility and minimum radius analyses"
             .into(),
         features: vec![
             boss::schema(),

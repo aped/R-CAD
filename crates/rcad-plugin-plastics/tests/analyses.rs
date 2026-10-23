@@ -304,6 +304,7 @@ fn request(
             Resolved::Body(BodyGeom {
                 body: mesh.body,
                 bounds: [[0.0; 3], [1.0; 3]],
+                faces: vec![],
             }),
         )]
         .into(),
