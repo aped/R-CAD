@@ -222,7 +222,7 @@ pub fn schema() -> FeatureSchema {
                 0.0,
                 nonneg,
                 None,
-                Some("NR"),
+                None,
             ),
             param(
                 "tip_radius",

@@ -93,7 +93,8 @@ sketch and facing it.
   axis), `rib_height` (6), `rib_chamfer` (3), `rib_tip_height` (2), `rib_angle_deg` (0), `rib_total_deg` (360);
 - mating boss: `mate_diameter` (6), `mate_hole_diameter` (3.4), `cbore_diameter` (6),
   `cbore_depth` (0: none), `csink_angle_deg` (90), `gap` (*rule* `CL`);
-- `root_radius` (0: none, *rule* `NR`): concave fillet where the shank meets its face;
+- `root_radius` (0: none; opt-in, not rule-bound, so existing rule-driven bosses keep their
+  geometry): concave fillet where the shank meets its face;
 - `tip_radius` (0: none): fillet of the shank top's outer edge;
 - alignment step: `step_diameter` (4.5), `step_depth` (1).
 
