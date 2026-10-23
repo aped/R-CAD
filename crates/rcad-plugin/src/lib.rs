@@ -153,7 +153,8 @@ pub enum Mode {
 pub enum Op {
     /// The region `profile` minus `holes` (plane coordinates of `frame`)
     /// swept along `frame.z` over `[from, to]` (mm; `from < to`), joined to
-    /// or cut from the body of input `body` (a Face or Body input). With
+    /// or cut from the body of input `body` (a Face or Body input, or a
+    /// Sketch input on a face of a body). With
     /// `taper_deg` ≠ 0 the walls are drafted: the section shrinks by
     /// `tan(taper)` per mm going from `from` towards `to` (negative grows);
     /// tapered tools take one polygon or circle and no holes.
@@ -347,6 +348,17 @@ pub fn expand_rule(template: &str, symbols: &BTreeMap<String, String>) -> Option
     Some(out)
 }
 
+/// The body an operation's `body` input names: a Face or Body input, or a
+/// Sketch input lying on a face of a body.
+pub fn target_body(req: &BuildRequest, input: &str) -> Option<u32> {
+    match req.inputs.get(input)? {
+        Resolved::Face(f) => Some(f.body),
+        Resolved::Body(b) => Some(b.body),
+        Resolved::Sketch(s) => s.body,
+        _ => None,
+    }
+}
+
 /// Check a build answer against the request: op ids unique, bodies named by
 /// Face/Body inputs, finite frames and spans, valid profiles. Hosts call this
 /// before executing anything (an external plugin's answer is untrusted).
@@ -382,9 +394,10 @@ pub fn check_ops(req: &BuildRequest, ops: &[Op]) -> Result<(), PluginError> {
         if !ids.insert(*id) {
             return bad("operation id repeated");
         }
-        match req.inputs.get(body) {
-            Some(Resolved::Face(_) | Resolved::Body(_)) => {}
-            _ => return bad(&format!("'{body}' is not a face or body input")),
+        if target_body(req, body).is_none() {
+            return bad(&format!(
+                "'{body}' is not a face or body input, or a sketch on a face of a body"
+            ));
         }
         if !frame.is_finite() {
             return bad("frame is not finite");

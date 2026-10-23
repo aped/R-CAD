@@ -316,11 +316,9 @@ pub(super) fn eval_plugin(
             mode,
             label,
         } = op;
-        let target = match &req.inputs[body] {
-            rp::Resolved::Face(f) => BodyId(f.body),
-            rp::Resolved::Body(b) => BodyId(b.body),
-            _ => unreachable!("checked by check_ops"),
-        };
+        let target = BodyId(rp::target_body(&req, body).ok_or_else(|| {
+            DocError::Validation(format!("{id}: operation {op_id}: no target body"))
+        })?);
         let what = if label.is_empty() {
             format!("operation {op_id}")
         } else {

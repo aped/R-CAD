@@ -84,5 +84,13 @@ pub(crate) fn face_role_label(role: &rcad_document::FaceRole) -> String {
             format!("{of} of occurrence {}{tool}", instance + 1)
         }
         FaceRole::Chamfer => "chamfer face".into(),
+        FaceRole::Plugin { op, of } => {
+            let of = match of {
+                rcad_document::CopiedRole::EndCap => "end cap".to_string(),
+                rcad_document::CopiedRole::StartCap => "start cap".to_string(),
+                rcad_document::CopiedRole::Side { entity } => format!("side {}", entity + 1),
+            };
+            format!("{of} of operation {op}")
+        }
     }
 }

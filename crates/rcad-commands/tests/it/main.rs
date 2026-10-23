@@ -65,6 +65,7 @@ mod perf_bench;
 mod persistence_failures;
 mod piece_identity;
 mod piece_retarget_fuzz;
+mod plastics;
 mod print_examples;
 mod print_export;
 mod print_goldens;

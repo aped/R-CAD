@@ -11,6 +11,7 @@ pub mod mass;
 pub mod measure_faces;
 pub mod mesh_edit;
 pub mod mesh_repair;
+pub mod plugins;
 
 /// "R-CAD 1.0.0 (<git revision or "dev build">, native format v9)". The
 /// revision comes from `RCAD_GIT_REV` at build time (tools/release.sh sets it).
@@ -1086,6 +1087,17 @@ pub enum Command {
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         safe_mode: bool,
     },
+    /// Plugin features and data (docs/PLUGINS.md): the installed plugins
+    /// with their manifests (`Response::plugins`).
+    ListPlugins,
+    /// Create a feature of a plugin (`plugins::PluginFeatureCmd`; edit it
+    /// with `redefine_feature`).
+    PluginFeature(plugins::PluginFeatureCmd),
+    /// Store a plugin's document data, e.g. plastic rules
+    /// (`plugins::SetPluginDataCmd`; one undo step with its effects).
+    SetPluginData(plugins::SetPluginDataCmd),
+    /// Run a read-only plugin analysis (`Response::plugin_report`).
+    RunPluginAnalysis(plugins::PluginAnalysisCmd),
     /// Replace the definition of feature `feature` (Edit Feature): same id
     /// and history position, one undoable step. `kind` must be the same
     /// feature type; a body id 0 in a New Body operation means "the body the
@@ -1424,6 +1436,10 @@ impl Command {
             Command::AtRevision { command, .. } => command.name(),
             Command::SetDocumentUnits { .. } => "set_document_units",
             Command::RedefineFeature { .. } => "redefine_feature",
+            Command::ListPlugins => "list_plugins",
+            Command::PluginFeature(_) => "plugin_feature",
+            Command::SetPluginData(_) => "set_plugin_data",
+            Command::RunPluginAnalysis(_) => "run_plugin_analysis",
             Command::SketchOp { .. } => "sketch_op",
             Command::Close => "close",
             Command::SaveCopy { .. } => "save_copy",
@@ -1725,6 +1741,12 @@ pub struct Response {
     /// `inspect_mesh`: diagnosis and self-intersection check.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mesh_inspection: Option<mesh_edit::MeshInspection>,
+    /// `list_plugins`: the installed plugins.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plugins: Option<Vec<plugins::PluginInfo>>,
+    /// `run_plugin_analysis`: the plugin's report.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plugin_report: Option<serde_json::Value>,
     /// Set by a queueing front end (the app engine) when this command was not
     /// executed because a newer edit of the same parameter was already queued
     /// behind it. `ok` is true and nothing changed. [`Session`] never sets it.
@@ -1758,6 +1780,7 @@ impl Default for Session {
 
 impl Session {
     pub fn new() -> Self {
+        plugins::register_builtin();
         Self {
             model: None,
             path: None,
@@ -4311,6 +4334,25 @@ impl Session {
                 msg += &load_notes(&report);
                 r.message = Some(msg);
             }
+            Command::ListPlugins => {
+                let v = plugins::list();
+                r.message = Some(format!("{} plugin(s)", v.len()));
+                r.plugins = Some(v);
+            }
+            Command::PluginFeature(c) => {
+                let id = plugins::create_feature(self.model_mut()?, c)?;
+                r.feature = Some(id);
+            }
+            Command::SetPluginData(c) => {
+                r.message = Some(plugins::set_data(self.model_mut()?, c)?);
+            }
+            Command::RunPluginAnalysis(c) => {
+                let m = self
+                    .model
+                    .as_ref()
+                    .ok_or(DocError::Validation("no document is open".into()))?;
+                r.plugin_report = Some(plugins::run_analysis(m, c)?);
+            }
             Command::RedefineFeature {
                 feature,
                 kind,
@@ -4652,6 +4694,7 @@ fn summarize(doc: &Document, m: &Model) -> Vec<FeatureSummary> {
                 FeatureKind::Combine { .. } => ("combine", None),
                 FeatureKind::Countersink { .. } => ("countersink", None),
                 FeatureKind::Thread { plane, .. } => ("thread", Some(*plane)),
+                FeatureKind::Plugin { .. } => ("plugin", None),
             };
             let (operation, extent, reverse) = match &f.kind {
                 FeatureKind::Extrude {
@@ -4740,6 +4783,7 @@ fn summarize(doc: &Document, m: &Model) -> Vec<FeatureSummary> {
                         | FeatureKind::ChamferLoop { .. }
                         | FeatureKind::Loft { .. }
                         | FeatureKind::Sweep { .. }
+                        | FeatureKind::Plugin { .. }
                 )
                 .then(|| f.kind.clone()),
             }
