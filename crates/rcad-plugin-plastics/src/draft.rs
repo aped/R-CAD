@@ -31,7 +31,10 @@ pub fn schema() -> FeatureSchema {
             Some(30.0),
             Some("DA"),
         )],
-        choices: vec![choice("direction", "Direction", &["pull", "reverse"])],
+        choices: vec![
+            choice("direction", "Direction", &["pull", "reverse"]),
+            choice("sides", "Draft sides", &["one_side", "two_sides"]),
+        ],
     }
 }
 
@@ -54,6 +57,24 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
     let nf = fixed.frame.z;
     // Pull: away from the fixed face, into the part.
     let pull = scale(nf, -1.0);
+    if req.choice("sides")? == "two_sides" {
+        // Parting line: faces crossing the plane are split there and each
+        // side leans in going away from it (kernel polyhedral draft).
+        if faces.iter().any(|f| f.body != fixed.body) {
+            return Err(invalid(F, "the faces must be on the fixed plane's body"));
+        }
+        return Ok(vec![Op::DraftFaces {
+            id: 0,
+            body: "fixed".into(),
+            faces: faces.iter().map(|f| [f.frame.origin, f.frame.z]).collect(),
+            plane_point: fixed.frame.origin,
+            plane_normal: nf,
+            pull: scale(pull, sign),
+            angle_deg: a.to_degrees(),
+            two_sided: true,
+            label: "two-sided draft".into(),
+        }]);
+    }
     let mut ops = Vec::new();
     for (i, f) in faces.iter().enumerate() {
         if f.body != fixed.body {

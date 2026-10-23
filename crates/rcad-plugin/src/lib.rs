@@ -222,6 +222,26 @@ pub enum Op {
         #[serde(default)]
         label: String,
     },
+    /// Exact draft of the planar faces in planes `faces` (a point and the
+    /// outward unit normal each; faces of the body of input `body`, also ones
+    /// made earlier in this build) about the parting plane through `plane_point` with normal
+    /// `plane_normal`, by `angle_deg`, leaning in going along `pull`; with
+    /// `two_sided` the faces crossing the plane are split and the far side
+    /// leans in going the other way. The kernel's polyhedral draft: every
+    /// moved vertex is the intersection of its faces' planes (no booleans).
+    DraftFaces {
+        id: u32,
+        body: String,
+        faces: Vec<[[f64; 3]; 2]>,
+        plane_point: [f64; 3],
+        plane_normal: [f64; 3],
+        pull: [f64; 3],
+        angle_deg: f64,
+        #[serde(default)]
+        two_sided: bool,
+        #[serde(default)]
+        label: String,
+    },
     /// Exact fillet of radius `radius` of the straight edge where the faces
     /// in planes `a` and `b` (a point and the outward unit normal each) meet,
     /// on the body of input `body`: the kernel's edge fillet (convex or
@@ -533,6 +553,52 @@ pub fn check_ops(req: &BuildRequest, ops: &[Op]) -> Result<(), PluginError> {
     let mut ids = std::collections::BTreeSet::new();
     let mut prisms = std::collections::BTreeSet::new();
     for op in ops {
+        if let Op::DraftFaces {
+            id,
+            body,
+            faces,
+            plane_point,
+            plane_normal,
+            pull,
+            angle_deg,
+            label,
+            ..
+        } = op
+        {
+            let what = format!(
+                "{}: {}",
+                req.feature,
+                if label.is_empty() { "draft" } else { label }
+            );
+            let bad = |m: &str| Err(PluginError::Failed(format!("{what}: {m}")));
+            if !ids.insert(*id) {
+                return bad("operation id repeated");
+            }
+            if target_body(req, body).is_none() {
+                return bad(&format!(
+                    "'{body}' is not a face, body or sketch-on-face input"
+                ));
+            }
+            if faces.is_empty()
+                || !faces.iter().flatten().flatten().all(|v| v.is_finite())
+                || faces.iter().any(|f| (geom::norm(f[1]) - 1.0).abs() > 1e-9)
+            {
+                return bad("needs at least one face plane with a unit normal");
+            }
+            let ok = plane_point
+                .iter()
+                .chain(plane_normal)
+                .chain(pull)
+                .all(|v| v.is_finite())
+                && geom::norm(*plane_normal) > 1e-12
+                && geom::norm(*pull) > 1e-12
+                && angle_deg.is_finite()
+                && angle_deg.abs() < 89.0;
+            if !ok {
+                return bad("needs a finite plane, pull and an angle within ±89°");
+            }
+            continue;
+        }
         if let Op::EdgeFillet {
             id,
             body,

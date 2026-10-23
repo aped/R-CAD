@@ -316,6 +316,75 @@ pub(super) fn eval_plugin(
     }
     let mut tools = Vec::with_capacity(ops.len());
     for op in &ops {
+        if let rp::Op::DraftFaces {
+            body,
+            faces,
+            plane_point,
+            plane_normal,
+            pull,
+            angle_deg,
+            two_sided,
+            label,
+            ..
+        } = op
+        {
+            let target =
+                BodyId(rp::target_body(&req, body).ok_or_else(|| {
+                    DocError::Validation(format!("{id}: {label}: no target body"))
+                })?);
+            let t = brep_target(st, id, target)?;
+            let kinds = k::classify_faces(&t).map_err(kernel(id))?;
+            let mut idx = Vec::new();
+            for fp in faces {
+                let (o, n) = (fp[0], fp[1]);
+                let hits: Vec<usize> = kinds
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, f)| match f {
+                        k::DirectFace::Plane { origin, normal }
+                            if dot(*normal, n) > 1.0 - 1e-9
+                                && dot(sub(*origin, o), n).abs() <= k::tol::FACE_MATCH =>
+                        {
+                            Some(i)
+                        }
+                        _ => None,
+                    })
+                    .collect();
+                let [fi] = hits.as_slice() else {
+                    return Err(DocError::BrokenReference {
+                        from: id,
+                        detail: format!(
+                            "{label}: {} faces of {target} lie in a face's plane; refusing to guess",
+                            hits.len()
+                        ),
+                    });
+                };
+                idx.push(*fi);
+            }
+            let out = k::draft_faces(
+                &t,
+                &idx,
+                *plane_point,
+                *plane_normal,
+                *pull,
+                angle_deg.to_radians(),
+                *two_sided,
+            )
+            .map_err(|e| match e {
+                k::KernelError::InvalidInput(m) => {
+                    DocError::ProductLimit(format!("{id}: {label}: {m}"))
+                }
+                other => DocError::Kernel {
+                    feature: id,
+                    detail: format!("{label}: {other}"),
+                },
+            })?;
+            replace_body(st, id, target, out);
+            if r.body.is_none() {
+                r.body = Some(target);
+            }
+            continue;
+        }
         if let rp::Op::EdgeFillet {
             body,
             a,

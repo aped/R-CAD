@@ -123,3 +123,44 @@ fn draft_follows_the_rule_and_refuses_parallel_faces() {
     );
     assert!(m.contains("parallel to the fixed plane"), "{m}");
 }
+
+#[test]
+fn a_two_sided_draft_narrows_away_from_the_parting_plane() {
+    let mut s = Session::new();
+    ok(&mut s, Command::NewDocument);
+    let e = plate(&mut s, SketchPlane::WorldXY, 40.0, 30.0, 20.0);
+    // Parting plane 10 mm up (offset from the bottom, which faces -z: -10).
+    let mid = SketchPlane::Offset {
+        base: rcad_document::PlaneBase::Face(start_cap(e)),
+        distance: -10.0,
+        angle: 0.0,
+    };
+    ok(
+        &mut s,
+        feature(
+            "draft",
+            &[("faces", sides(e)), ("fixed", face_in(mid))],
+            &[("draft_deg", 3.0)],
+            &[("sides", "two_sides")],
+        ),
+    );
+    let t = 3f64.to_radians().tan();
+    assert_close(
+        vol(&s, BodyId(1)),
+        2.0 * tapered_box(40.0, 30.0, 10.0, t),
+        1e-9,
+        "two-sided draft",
+    );
+    // Widest at the parting plane, inset 10 tan 3° at top and bottom.
+    let inset = 10.0 * t;
+    let pr = probe(
+        &s,
+        BodyId(1),
+        &[
+            [19.99, 0.0, 10.0],
+            [20.0 - inset + 0.01, 0.0, 0.01],
+            [20.0 - inset + 0.01, 0.0, 19.99],
+        ],
+    );
+    assert_eq!(pr, [Some(true), Some(false), Some(false)]);
+}

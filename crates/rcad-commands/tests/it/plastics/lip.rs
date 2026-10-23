@@ -170,3 +170,63 @@ fn extents_make_a_partial_lip_and_groove() {
     );
     assert_close(vol(&s, BodyId(1)), BOX + 17.0 * 2.0, 1e-6, "corner lip");
 }
+
+#[test]
+fn a_drafted_lip_and_its_groove_are_trapezoids() {
+    let (mut s, e) = open_box();
+    let lid = plate(&mut s, offset_xy(20.0), 60.0, 40.0, 10.0);
+    ok(
+        &mut s,
+        Command::ShellFace {
+            name: None,
+            face: start_cap(lid),
+            thickness: 2.0,
+        },
+    );
+    let lid_v = vol(&s, BodyId(2));
+    ok(
+        &mut s,
+        feature(
+            "lip",
+            &[
+                ("face", face_in(end_cap(e))),
+                ("mate", face_in(SketchPlane::Face(start_cap(lid)))),
+            ],
+            &[
+                ("width", 1.0),
+                ("height", 2.0),
+                ("clearance", 0.1),
+                ("draft_deg", 5.0),
+            ],
+            &[("type", "lip_and_groove")],
+        ),
+    );
+    let t = 5f64.to_radians().tan();
+    // Band beyond the 56 x 36 cavity, half-width u, mitred corners:
+    // 184 u + 4 u²; integrated over the height as u = c - t s.
+    let integral = |c: f64, l: f64| {
+        184.0 * (c * l - t * l * l / 2.0) + 4.0 * (c.powi(3) - (c - t * l).powi(3)) / (3.0 * t)
+    };
+    assert_close(
+        vol(&s, BodyId(1)),
+        BOX + integral(1.0, 2.0),
+        1e-9,
+        "drafted lip",
+    );
+    assert_close(
+        vol(&s, BodyId(2)),
+        lid_v - integral(1.1, 2.1),
+        1e-9,
+        "drafted groove",
+    );
+    let top_w = 1.0 - 2.0 * t;
+    let pr = probe(
+        &s,
+        BodyId(1),
+        &[
+            [28.0 + top_w - 0.02, 0.0, 21.99],
+            [28.0 + top_w + 0.02, 0.0, 21.99],
+        ],
+    );
+    assert_eq!(pr, [Some(true), Some(false)]);
+}

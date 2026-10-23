@@ -69,6 +69,15 @@ pub fn schema() -> FeatureSchema {
                 None,
                 Some("CL"),
             ),
+            param(
+                "draft_deg",
+                "Draft (trapezoidal section)",
+                ParamKind::Angle,
+                0.0,
+                Some((0.0, false)),
+                Some(30.0),
+                None,
+            ),
         ],
         choices: vec![
             choice("type", "Type", &["lip", "groove", "lip_and_groove"]),
@@ -378,6 +387,36 @@ fn chain_band(
     Ok(Profile::Loop { segments: segs })
 }
 
+/// Planes (point, unit normal) of the faces standing on the edges of the
+/// straight-edged loop `p` (in `f`'s plane), normals to the right of the
+/// counter-clockwise loop (`right`) or to its left.
+fn edge_planes(f: &FaceGeom, p: &Profile, right: bool) -> Result<Vec<[[f64; 3]; 2]>, PluginError> {
+    let canon = Profile::from_sketch(&p.to_sketch().map_err(|e| invalid(F, e))?);
+    let pts = match canon {
+        Some(Profile::Polygon { points }) => points,
+        _ => {
+            return Err(unsupported(
+                F,
+                "drafted lips need a rim of straight edges (no arcs)",
+            ));
+        }
+    };
+    let n = pts.len();
+    Ok((0..n)
+        .map(|k| {
+            let (a, b) = (pts[k], pts[(k + 1) % n]);
+            let l = (b[0] - a[0]).hypot(b[1] - a[1]);
+            let (ex, ey) = ((b[0] - a[0]) / l, (b[1] - a[1]) / l);
+            let (nx, ny) = if right { (ey, -ex) } else { (-ey, ex) };
+            let nrm = rcad_plugin::geom::add(
+                rcad_plugin::geom::scale(f.frame.x, nx),
+                rcad_plugin::geom::scale(f.frame.y, ny),
+            );
+            [f.frame.point(a, 0.0), nrm]
+        })
+        .collect())
+}
+
 pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
     let (w, h, cl) = (
         req.param("width")?,
@@ -461,6 +500,48 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
             "lip".into(),
         ));
     }
+    // Draft (trapezoidal section): the lip's reveal faces lean in going up
+    // and the groove's matching wall narrows with depth, both turned about
+    // their rim planes (exact polyhedral draft).
+    let da = req.param("draft_deg")?;
+    let draft = |f: &FaceGeom,
+                 input: &str,
+                 id: u32,
+                 d: f64,
+                 wall_right: bool,
+                 what: &str|
+     -> Result<Op, PluginError> {
+        if ext.is_some() {
+            return Err(unsupported(
+                F,
+                "drafted lips run along the whole rim (no extents)",
+            ));
+        }
+        let (o, i) = rim(f, what)?;
+        let lp = if inner {
+            off(&i, d, what)?
+        } else {
+            off(&o, -d, what)?
+        };
+        Ok(Op::DraftFaces {
+            id,
+            body: input.into(),
+            faces: edge_planes(f, &lp, wall_right)?,
+            plane_point: f.frame.origin,
+            plane_normal: f.frame.z,
+            pull: f.frame.z,
+            angle_deg: da,
+            two_sided: false,
+            label: format!("{what} draft"),
+        })
+    };
+    if da > 0.0 && kind != "groove" {
+        if w - h * da.to_radians().tan() <= EPS {
+            return Err(invalid(F, "the draft closes the lip before its height"));
+        }
+        // The lip's reveal faces face away from the wall's middle.
+        ops.push(draft(face, "face", 2, w, inner, "lip")?);
+    }
     match kind {
         "groove" => ops.push(groove("face", face, 1)?),
         "lip_and_groove" => {
@@ -476,6 +557,16 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
             ops.push(groove("mate", m, 1)?);
         }
         _ => {}
+    }
+    if da > 0.0 && kind != "lip" {
+        let (f, input) = if kind == "groove" {
+            (face, "face")
+        } else {
+            (req.face("mate")?, "mate")
+        };
+        // The groove's outer wall faces into the groove (towards the cavity
+        // for an inner lip); turned about the mouth it narrows with depth.
+        ops.push(draft(f, input, 3, w + cl, !inner, "groove")?);
     }
     Ok(ops)
 }

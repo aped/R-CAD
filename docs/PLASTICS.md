@@ -93,6 +93,7 @@ sketch and facing it.
   axis), `rib_height` (6), `rib_chamfer` (3), `rib_tip_height` (2), `rib_angle_deg` (0), `rib_total_deg` (360);
 - mating boss: `mate_diameter` (6), `mate_hole_diameter` (3.4), `cbore_diameter` (6),
   `cbore_depth` (0: none), `csink_angle_deg` (90), `gap` (*rule* `CL`);
+- `root_radius` (0: none, *rule* `NR`): concave fillet where the shank meets its face;
 - `tip_radius` (0: none): fillet of the shank top's outer edge;
 - alignment step: `step_diameter` (4.5), `step_depth` (1).
 
@@ -131,7 +132,12 @@ on each shank top and a recess `gap` wider and deeper in the mating boss; `in` i
 kernel refuses it where gussets reach the top, the hole is within the radius of the edge, or the
 shank is drafted.
 
-**Not modelled:** root fillets (the kernel blends convex cap loops, not the concave base edge),
+**Root fillet.** An exact torus band built into the topology by the kernel. The base loop is
+widened, the shank wall shortened, and a toroidal face is inserted (no boolean, so no tangent
+contacts). It applies to straight shanks with nothing else on the base loop: no gussets, and the
+mating shank too.
+
+**Not modelled:** root fillets on drafted shanks (the kernel's root fillet takes a cylinder),
 drafted ribs, fastener components.
 
 ## Rib and Web
@@ -140,7 +146,8 @@ Thin walls from open chains of sketch lines and arcs.
 
 **Inputs:** `sketch`; `body` (when the sketch is not on a face).
 
-**Parameters:** `thickness` (*rule* `T`), `depth` (10), `draft_deg` (*rule* `DA`).
+**Parameters:** `thickness` (*rule* `T`), `depth` (10), `draft_deg` (*rule* `DA`), `fillet_radius`
+(0: none).
 
 **Choices:** `thickness_side`: `symmetric` | `one_side`.
 - Rib also has `side`: `left` | `right`, and `extent`: `distance` | `to_next`.
@@ -166,7 +173,11 @@ are filled.
 **Refused:** circles; drafted ribs and webs along arcs (the drafted wall would be a cone
 section); a draft that closes the wall before its depth.
 
-**Not modelled:** root fillets (concave blends), Extend Curves.
+**Root fillets** (`fillet_radius`). Each straight wall's two edges along the face it stands on
+get exact edge fillets (the kernel's concave edge fillet). This needs `to_next`, so that face is
+known. Lines that cross split those edges, and the kernel then refuses with the reason.
+
+**Not modelled:** root fillets along arcs, Extend Curves.
 
 ## Snap Fit
 
@@ -180,7 +191,8 @@ Cantilever hooks at sketch points, with an optional mating groove or loop.
 - catch: `catch_depth` (*rule* `T/3`), `catch_height` (*rule* `T`), `insertion_deg` (30),
   `retention_deg` (90);
 - stand-off: `base_depth` (5);
-- mating feature: `clearance` (*rule* `CL`), `loop_thickness` (1.5), `loop_length` (3).
+- mating feature: `clearance` (*rule* `CL`), `loop_thickness` (1.5), `loop_length` (3);
+- `base_fillet` (0: none): exact fillets of both sides of the beam where it meets its face.
 
 **Choices:** `type`: `hook_and_groove` | `hook_and_loop`; `orientation`: `perpendicular` |
 `parallel`; `extent`: `to_next` | `distance`; `orient`: `uniform` | `outward` | `inward`.
@@ -207,7 +219,7 @@ form of Fusion's Aligned rotation.
 
 **Refused:** a catch too short for its angles; a catch longer than the beam.
 
-**Not modelled:** base fillet, deflection/strain checks (Fusion has none either), Fusion's
+**Not modelled:** deflection/strain checks (Fusion has none either), Fusion's
 lettered advanced dimensions.
 
 ## Lip
@@ -218,7 +230,8 @@ one inner boundary loop.
 **Inputs:** `face` (the rim); `mate` (the other half's rim, for `lip_and_groove`); `extents`
 (optional: two points on the rim).
 
-**Parameters:** `width` (*rule* `T/2`), `height` (*rule* `RH`), `clearance` (*rule* `CL`).
+**Parameters:** `width` (*rule* `T/2`), `height` (*rule* `RH`), `clearance` (*rule* `CL`),
+`draft_deg` (0).
 
 **Choices:** `type`: `lip` | `groove` | `lip_and_groove`; `position`: `inner` | `outer`.
 
@@ -236,9 +249,10 @@ point to the second, counter-clockwise seen from outside the face. The band's en
 with exact offset lines and arcs and mitred corners. The rim face and `position` stand for
 Fusion's edge chain and face guide.
 
-**Not modelled:** Trapezoidal (drafted)
-sections are not available yet: the exact constructions tried (a tapered tool across the cavity,
-per-edge trapezoids, per-edge draft wedges) fail in the boolean kernel at the rim corners.
+**Draft** (`draft_deg`, trapezoidal section). The lip's reveal faces lean in going up, and the
+groove's matching wall narrows with depth. Both turn about their rim planes through the kernel's
+exact polyhedral draft, with mitred corners and no booleans. Drafts apply to whole rims of
+straight edges; with arcs in the rim or with extents they are refused.
 The rim face stands for the edge chain.
 
 ## Rest
@@ -277,7 +291,7 @@ Fusion's fixed-plane draft of existing faces.
 
 **Parameters:** `draft_deg` (1, *rule* `DA`, 0–30).
 
-**Choices:** `direction`: `pull` | `reverse`.
+**Choices:** `direction`: `pull` | `reverse`; `sides`: `one_side` | `two_sides`.
 
 **Result.** Each face turns about its line on the fixed plane by the angle, relative to its
 current orientation, leaning in as it goes along the pull direction (away from the fixed face,
@@ -289,7 +303,13 @@ face replacement does not take (not a convex single loop of straight edges with 
 neighbours, or a vertex with more than one side edge, e.g. a wall with a hole or a filleted
 corner).
 
-**Not modelled:** parting-line drafts, two-sided and symmetric drafts, tangent chains.
+**Two sides** (Fusion's parting-line draft with a planar parting line). Faces crossing the fixed
+plane are split along it, and each side leans in going away from the plane. This uses the
+kernel's polyhedral draft: every moved vertex is the intersection of its faces' planes, so the
+result is exact with no booleans. It needs planar faces with straight edges around the drafted
+faces.
+
+**Not modelled:** curved (non-planar) parting lines, tangent chains, drafts of curved faces.
 
 ## Design Advice
 
