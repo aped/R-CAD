@@ -183,13 +183,17 @@ Cantilever hooks at sketch points, with an optional mating groove or loop.
 - mating feature: `clearance` (*rule* `CL`), `loop_thickness` (1.5), `loop_length` (3).
 
 **Choices:** `type`: `hook_and_groove` | `hook_and_loop`; `orientation`: `perpendicular` |
-`parallel`; `extent`: `to_next` | `distance`.
+`parallel`; `extent`: `to_next` | `distance`; `orient`: `uniform` | `outward` | `inward`.
 
 **Hook.** The hook is a section standing on the sketch plane, swept across its `width`:
 - the beam tapers from `thickness` at the root to `tip_thickness` at `length`;
 - the catch at the tip protrudes `catch_depth`, with a retention face at `retention_deg` and an
   insertion face at `insertion_deg`, both measured to the beam axis. 90° retention is a flat,
   permanent ledge.
+
+**Rotation.** `uniform` turns every catch to `rotation_deg`. `outward` and `inward` point each
+catch away from or towards the centroid of the points, plus `rotation_deg`. This is a fixed-point
+form of Fusion's Aligned rotation.
 
 **Root.**
 - `perpendicular` hooks stand on the sketch's face.

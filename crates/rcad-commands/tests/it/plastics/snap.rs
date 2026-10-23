@@ -187,3 +187,43 @@ fn impossible_catches_are_refused() {
     assert!(m.contains("shorter than the beam"), "{m}");
     assert_close(vol(&s, BodyId(1)), PLATE, 1e-12, "unchanged");
 }
+
+#[test]
+fn outward_hooks_point_away_from_their_centroid() {
+    let (mut s, e) = setup();
+    let sk = points_sketch(
+        &mut s,
+        end_cap(e),
+        &[[-20.0, 0.0], [20.0, 0.0], [0.0, 15.0]],
+    );
+    ok(
+        &mut s,
+        feature(
+            "snap_fit",
+            &[("sketch", sketch_in(sk))],
+            &HOOK,
+            &[("orient", "outward")],
+        ),
+    );
+    assert_close(
+        vol(&s, BodyId(1)),
+        PLATE + 3.0 * 5.0 * hook_area(8.0),
+        1e-6,
+        "three hooks",
+    );
+    // Centroid (0, 5): the catch at (20, 0) points along (20, -5)/|.|; the one
+    // at (0, 15) along +y. Probe just inside each catch tip (1.6 out, z 10.1).
+    let d = (20.0f64).hypot(5.0);
+    let (ux, uy) = (20.0 / d, -5.0 / d);
+    let pr = probe(
+        &s,
+        BodyId(1),
+        &[
+            [20.0 + 1.6 * ux, 1.6 * uy, 10.1],
+            [20.0 - 1.6 * ux, -1.6 * uy, 10.1],
+            [0.0, 15.0 + 1.6, 10.1],
+            [0.0, 15.0 - 1.6, 10.1],
+        ],
+    );
+    assert_eq!(pr, [Some(true), Some(false), Some(true), Some(false)]);
+}

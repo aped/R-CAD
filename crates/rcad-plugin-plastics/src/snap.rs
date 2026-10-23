@@ -2,7 +2,8 @@
 //! points, with a mating groove (window) or loop on a second body.
 //!
 //! Section of a hook in the plane standing on the sketch plane at the point,
-//! along the sketch direction at `rotation_deg` (`x`: the side the catch
+//! along the sketch direction at `rotation_deg` (or, with `orient`
+//! outward/inward, away from/towards the points' centroid; `x`: the side the catch
 //! points to; `y`: the sketch normal), `width` wide across it:
 //! * beam from `x = 0` to its thickness, `thickness` at the root tapering to
 //!   `tip_thickness` at `length` above the sketch plane;
@@ -146,6 +147,7 @@ pub fn schema() -> FeatureSchema {
             choice("type", "Type", &["hook_and_groove", "hook_and_loop"]),
             choice("orientation", "Hook", &["perpendicular", "parallel"]),
             choice("extent", "Stand-off (parallel)", &["to_next", "distance"]),
+            choice("orient", "Rotation", &["uniform", "outward", "inward"]),
         ],
     }
 }
@@ -256,12 +258,43 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
     let hk = hook(req, y0)?;
     let cl = p("clearance")?;
     let rot = p("rotation_deg")?.to_radians();
+    // Uniform: every catch along `rotation_deg`; outward / inward: each
+    // catch away from / towards the centroid of the points (plus the
+    // rotation), e.g. hooks round a box catching its walls.
+    let orient = req.choice("orient")?;
+    let n = pts.len() as f64;
+    let centroid = [
+        pts.iter().map(|p| p[0]).sum::<f64>() / n,
+        pts.iter().map(|p| p[1]).sum::<f64>() / n,
+    ];
     let mate = req.has("mate");
     let kind = req.choice("type")?;
     let mut ops = Vec::new();
     for (i, pt) in pts.iter().enumerate() {
         let id = 8 * i as u32;
-        let f = standing(&s.frame, *pt, rot);
+        let a = match orient {
+            "uniform" => rot,
+            o => {
+                let (dx, dy) = (pt[0] - centroid[0], pt[1] - centroid[1]);
+                if dx.hypot(dy) < EPS {
+                    return Err(invalid(
+                        F,
+                        format!(
+                            "snap fit {}: at the centroid of the points, it has no outward direction",
+                            i + 1
+                        ),
+                    ));
+                }
+                dy.atan2(dx)
+                    + rot
+                    + if o == "inward" {
+                        std::f64::consts::PI
+                    } else {
+                        0.0
+                    }
+            }
+        };
+        let f = standing(&s.frame, *pt, a);
         let half = hk.width / 2.0;
         let lbl = |w: &str| format!("snap fit {}: {w}", i + 1);
         ops.push(prism(
