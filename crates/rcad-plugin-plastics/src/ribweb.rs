@@ -14,8 +14,8 @@
 //!   that face). Draft narrows the web away from the sketch plane.
 //!
 //! Lines meeting at an end are each extended by half the thickness there,
-//! so corners are filled. Arcs and circles are refused (a straight prism per
-//! curve is exact only for lines). Not supported: fillets, extending free
+//! so corners are filled. Arcs are exact annular-sector prisms (not drafted;
+//! a drafted arc wall would be a cone section); circles are refused. Not supported: fillets, extending free
 //! ends to the next face (Fusion's Extend Curves).
 use crate::util::SINK;
 use crate::util::{EPS, invalid, prism, unsupported};
@@ -23,7 +23,8 @@ use crate::{choice, input, param};
 use rcad_plugin::geom::{add, cross, footprint_of, next_above_over, next_below_over, scale};
 use rcad_plugin::schema::FeatureSchema;
 use rcad_plugin::{
-    BuildRequest, Curve, Frame, InputKind, Mode, Op, ParamKind, PluginError, Profile, SketchGeom,
+    BuildRequest, Curve, Frame, InputKind, Mode, Op, ParamKind, PluginError, Profile, Segment,
+    SketchGeom,
 };
 
 fn common(
@@ -99,38 +100,110 @@ pub fn web_schema() -> FeatureSchema {
 /// A line `(a, b)` and how far to extend it at `a` and at `b`.
 type Ends = ([f64; 2], [f64; 2], f64, f64);
 
-/// The sketch's lines with how far to extend each end (half the thickness
-/// where another line ends at the same point).
-fn lines(f: &str, s: &SketchGeom, t: f64) -> Result<Vec<Ends>, PluginError> {
-    let mut v = Vec::new();
-    for c in &s.curves {
-        match c {
-            Curve::Line { a, b } => v.push((*a, *b)),
-            _ => {
+/// A sketch arc: centre, radius, start angle and counter-clockwise sweep.
+#[derive(Clone, Copy)]
+struct Arc {
+    c: [f64; 2],
+    r: f64,
+    a0: f64,
+    sweep: f64,
+}
+
+impl Arc {
+    fn at(&self, f: f64) -> [f64; 2] {
+        let t = self.a0 + self.sweep * f;
+        [self.c[0] + self.r * t.cos(), self.c[1] + self.r * t.sin()]
+    }
+
+    /// The annular sector between radii `r0 < r1` over the arc's angles.
+    fn sector(&self, f: &str, r0: f64, r1: f64) -> Result<Profile, PluginError> {
+        if r0 <= EPS {
+            return Err(invalid(f, "the wall reaches the centre of a sketch arc"));
+        }
+        let p = |r: f64, t: f64| {
+            let a = self.a0 + self.sweep * t;
+            [self.c[0] + r * a.cos(), self.c[1] + r * a.sin()]
+        };
+        Ok(Profile::Loop {
+            segments: vec![
+                Segment::Arc {
+                    start: p(r1, 0.0),
+                    center: self.c,
+                    ccw: true,
+                },
+                Segment::Line { start: p(r1, 1.0) },
+                Segment::Arc {
+                    start: p(r0, 1.0),
+                    center: self.c,
+                    ccw: false,
+                },
+                Segment::Line { start: p(r0, 0.0) },
+            ],
+        })
+    }
+}
+
+/// The sketch's lines (with how far to extend each end: half the
+/// thickness where another curve ends at the same point) and arcs, each with
+/// its index among the sketch's curves (the operation id). Circles are
+/// refused (a closed ring is a thin extrusion, not a rib).
+fn curves(
+    f: &str,
+    s: &SketchGeom,
+    t: f64,
+) -> Result<(Vec<(u32, Ends)>, Vec<(u32, Arc)>), PluginError> {
+    let mut lines = Vec::new();
+    let mut arcs = Vec::new();
+    let mut ends: Vec<(usize, [f64; 2])> = Vec::new();
+    for (i, c) in s.curves.iter().enumerate() {
+        match *c {
+            Curve::Line { a, b } => {
+                lines.push((i, a, b));
+                ends.push((i, a));
+                ends.push((i, b));
+            }
+            Curve::Arc {
+                center,
+                radius,
+                start,
+                end,
+            } => {
+                let sweep = (end - start).rem_euclid(std::f64::consts::TAU);
+                if sweep < 1e-9 {
+                    return Err(invalid(f, "a sketch arc has no sweep"));
+                }
+                let arc = Arc {
+                    c: center,
+                    r: radius,
+                    a0: start,
+                    sweep,
+                };
+                ends.push((i, arc.at(0.0)));
+                ends.push((i, arc.at(1.0)));
+                arcs.push((i as u32, arc));
+            }
+            Curve::Circle { .. } => {
                 return Err(unsupported(
                     f,
-                    "only straight sketch lines are supported (arcs and circles are not)",
+                    "circles are not supported (lines and arcs are; a closed ring is a thin extrusion)",
                 ));
             }
         }
     }
-    if v.is_empty() {
-        return Err(invalid(f, "the sketch has no lines"));
+    if lines.is_empty() && arcs.is_empty() {
+        return Err(invalid(f, "the sketch has no lines or arcs"));
     }
     let same = |p: [f64; 2], q: [f64; 2]| (p[0] - q[0]).hypot(p[1] - q[1]) < EPS;
-    let shared = |i: usize, p: [f64; 2]| {
-        v.iter()
-            .enumerate()
-            .any(|(j, (a, b))| j != i && (same(*a, p) || same(*b, p)))
-    };
-    Ok(v.iter()
-        .enumerate()
-        .map(|(i, (a, b))| {
-            let ea = if shared(i, *a) { t / 2.0 } else { 0.0 };
-            let eb = if shared(i, *b) { t / 2.0 } else { 0.0 };
-            (*a, *b, ea, eb)
+    let shared = |i: usize, p: [f64; 2]| ends.iter().any(|(j, q)| *j != i && same(*q, p));
+    let lines = lines
+        .into_iter()
+        .map(|(i, a, b)| {
+            let ea = if shared(i, a) { t / 2.0 } else { 0.0 };
+            let eb = if shared(i, b) { t / 2.0 } else { 0.0 };
+            (i as u32, (a, b, ea, eb))
         })
-        .collect())
+        .collect();
+    Ok((lines, arcs))
 }
 
 fn target(req: &BuildRequest, f: &str) -> Result<&'static str, PluginError> {
@@ -260,7 +333,9 @@ pub fn build_rib(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
         &s.faces
     };
     let mut ops = Vec::new();
-    for (i, (pa, pb, ea, eb)) in lines(f, s, t)?.into_iter().enumerate() {
+    let (lines, arcs) = curves(f, s, t)?;
+    for (id, (pa, pb, ea, eb)) in lines {
+        let i = id as usize;
         let l = line(f, pa, pb, ea, eb)?;
         let label = format!("rib line {}", i + 1);
         let depth = if to_next {
@@ -272,7 +347,7 @@ pub fn build_rib(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
             } else {
                 scale(l.left(&s.frame), -1.0)
             };
-            let mut far: f64 = 0.0;
+            let (mut near, mut far) = (f64::INFINITY, 0.0f64);
             // Interior samples: an end on a wall would hit that wall's edge.
             for k in 0..8 {
                 let p = s
@@ -287,7 +362,19 @@ pub fn build_rib(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
                         ),
                     )
                 })?;
+                near = near.min(hit);
                 far = far.max(hit);
+            }
+            // A constant-depth rib reaches the face exactly only where it is
+            // at one distance along the whole curve.
+            if far - near > 1e-6 {
+                return Err(unsupported(
+                    f,
+                    format!(
+                        "to next: the next face is {near:.3} to {far:.3} mm away along the curve; \
+                         a rib has one depth (use a distance)"
+                    ),
+                ));
             }
             far + SINK
         } else {
@@ -328,6 +415,67 @@ pub fn build_rib(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
             ));
         }
     }
+    for (id, arc) in arcs {
+        let label = format!("rib arc {}", id + 1);
+        if a != 0.0 {
+            return Err(unsupported(
+                f,
+                "drafted ribs along arcs are not supported (straight lines only)",
+            ));
+        }
+        // Left of a counter-clockwise arc is towards its centre.
+        let d = if to_next {
+            let (mut near, mut far) = (f64::INFINITY, 0.0f64);
+            for k in 0..8 {
+                let q = arc.at((k as f64 + 0.5) / 8.0);
+                let out = [q[0] - arc.c[0], q[1] - arc.c[1]];
+                let n = out[0].hypot(out[1]);
+                let u = if left {
+                    [-out[0] / n, -out[1] / n]
+                } else {
+                    [out[0] / n, out[1] / n]
+                };
+                let dir = add(scale(s.frame.x, u[0]), scale(s.frame.y, u[1]));
+                let p = s.frame.point(q, 0.0);
+                let hit = rcad_plugin::geom::ray_to_face(faces, p, dir, EPS).ok_or_else(|| {
+                    invalid(f, format!("to next: no planar face of the body in the rib's direction from rib arc {}", id + 1))
+                })?;
+                near = near.min(hit);
+                far = far.max(hit);
+            }
+            // A constant-depth rib reaches the face exactly only where it is
+            // at one distance along the whole curve.
+            if far - near > 1e-6 {
+                return Err(unsupported(
+                    f,
+                    format!(
+                        "to next: the next face is {near:.3} to {far:.3} mm away along the curve; \
+                         a rib has one depth (use a distance)"
+                    ),
+                ));
+            }
+            far + SINK
+        } else {
+            depth
+        };
+        let (r0, r1) = if left {
+            (arc.r - d, arc.r)
+        } else {
+            (arc.r, arc.r + d)
+        };
+        let span = if sym { (-t / 2.0, t / 2.0) } else { (0.0, t) };
+        ops.push(prism(
+            id,
+            body,
+            s.frame,
+            arc.sector(f, r0, r1)?,
+            vec![],
+            span,
+            0.0,
+            Mode::Join,
+            label,
+        ));
+    }
     Ok(ops)
 }
 
@@ -343,7 +491,9 @@ pub fn build_web(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
     let up = req.choice("direction")? == "normal";
     let to_next = req.choice("extent")? == "to_next";
     let mut ops = Vec::new();
-    for (i, (pa, pb, ea, eb)) in lines(f, s, t)?.into_iter().enumerate() {
+    let (lines, arcs) = curves(f, s, t)?;
+    for (id, (pa, pb, ea, eb)) in lines {
+        let i = id as usize;
         let l = line(f, pa, pb, ea, eb)?;
         let label = format!("web line {}", i + 1);
         let (w0, w1) = if sym { (-t / 2.0, t / 2.0) } else { (0.0, t) };
@@ -399,6 +549,46 @@ pub fn build_web(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
                 label,
             ));
         }
+    }
+    for (id, arc) in arcs {
+        let label = format!("web arc {}", id + 1);
+        if a != 0.0 {
+            return Err(unsupported(
+                f,
+                "drafted webs along arcs are not supported (straight lines only)",
+            ));
+        }
+        let depth = if to_next {
+            let fp = footprint_of(&[arc.c], arc.r + t);
+            let next = if up {
+                next_above_over(&s.parallel, 0.0, EPS, &fp)
+            } else {
+                next_below_over(&s.parallel, 0.0, EPS, &fp).map(|h| -h)
+            };
+            next.ok_or_else(|| {
+                invalid(f, format!("to next: no face of the sketch's body under web arc {} faces the sketch plane", id + 1))
+            })? + SINK
+        } else {
+            req.param("depth")?
+        };
+        // Symmetric about the arc, or on its left (towards the centre).
+        let (r0, r1) = if sym {
+            (arc.r - t / 2.0, arc.r + t / 2.0)
+        } else {
+            (arc.r - t, arc.r)
+        };
+        let span = if up { (0.0, depth) } else { (-depth, 0.0) };
+        ops.push(prism(
+            id,
+            body,
+            s.frame,
+            arc.sector(f, r0, r1)?,
+            vec![],
+            span,
+            0.0,
+            Mode::Join,
+            label,
+        ));
     }
     Ok(ops)
 }

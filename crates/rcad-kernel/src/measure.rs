@@ -735,7 +735,8 @@ pub fn planar_face_outlines(body: &Body) -> Result<Vec<PlanarFaceOutline>> {
             for w in f.boundaries() {
                 let mut pts = Vec::new();
                 for e in w.edge_iter() {
-                    let cv = e.curve();
+                    // In the wire's direction (an edge may run against its curve).
+                    let cv = e.oriented_curve();
                     let (t0, t1) = cv.range_tuple();
                     for i in 0..16 {
                         let p = cv.subs(t0 + (t1 - t0) * i as f64 / 16.0);

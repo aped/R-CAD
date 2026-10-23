@@ -120,7 +120,7 @@ fn unsupported_rib_input_is_refused() {
         &mut s,
         feature("web", &[("sketch", sketch_in(circle))], &[], &[]),
     );
-    assert!(m.contains("only straight sketch lines"), "{m}");
+    assert!(m.contains("circles are not supported"), "{m}");
     let world = line_sketch(&mut s, offset_xy(30.0), &[([0.0, 0.0], [5.0, 0.0])]);
     let m = err(
         &mut s,
@@ -233,4 +233,99 @@ fn a_rib_to_next_reaches_the_floor_along_its_line() {
         ),
     );
     assert!(m.contains("no planar face"), "{m}");
+}
+
+/// A sketch with one counter-clockwise arc about `c`, radius `r`, from
+/// angle `a0` to `a1` (radians).
+fn arc_sketch(
+    s: &mut Session,
+    plane: SketchPlane,
+    c: [f64; 2],
+    r: f64,
+    a0: f64,
+    a1: f64,
+) -> FeatureId {
+    let mut sk = rcad_sketch::Sketch::default();
+    let pc = sk.add_point(c[0], c[1]);
+    let p0 = sk.add_point(c[0] + r * a0.cos(), c[1] + r * a0.sin());
+    let p1 = sk.add_point(c[0] + r * a1.cos(), c[1] + r * a1.sin());
+    sk.entities.push(rcad_sketch::Entity::Arc {
+        id: rcad_sketch::EntityId(1),
+        center: pc,
+        start: p0,
+        end: p1,
+    });
+    for (id, x, y) in [
+        (pc, c[0], c[1]),
+        (p0, c[0] + r * a0.cos(), c[1] + r * a0.sin()),
+        (p1, c[0] + r * a1.cos(), c[1] + r * a1.sin()),
+    ] {
+        sk.constraints
+            .push(rcad_sketch::Constraint::FixedPoint { p: id, x, y });
+    }
+    ok(
+        s,
+        Command::CreateSketch {
+            name: None,
+            plane,
+            template: SketchTemplate::Custom { sketch: sk },
+        },
+    )
+    .feature
+    .unwrap()
+}
+
+#[test]
+fn webs_and_ribs_follow_arcs_exactly() {
+    use std::f64::consts::PI;
+    let (mut s, e) = open_box();
+    // Half-circle web on the rim plane, r = 10, 2 thick, to the floor (18).
+    let sk = arc_sketch(&mut s, end_cap(e), [0.0, 0.0], 10.0, 0.0, PI);
+    ok(
+        &mut s,
+        feature(
+            "web",
+            &[("sketch", sketch_in(sk))],
+            &[("thickness", 2.0), ("draft_deg", 0.0)],
+            &[("direction", "flip"), ("extent", "to_next")],
+        ),
+    );
+    let web = PI / 2.0 * (11.0f64.powi(2) - 9.0f64.powi(2)) * 18.0;
+    assert_close(vol(&s, BodyId(1)), BOX + web, 1e-6, "arc web");
+    // Rib along an arc in the XZ plane (centre x 0, z 9; r 4, lower half),
+    // grown outward 3.5 mm, 2 thick: r 4..7.5, clear of the web ring (|x| >= 9
+    // at y = 0); its bottom dips 0.5 into the floor (z < 2), which adds
+    // nothing: the circular segment of r 7.5 below the chord 7 from the centre.
+    let sk = arc_sketch(&mut s, SketchPlane::WorldXZ, [0.0, 9.0], 4.0, PI, 2.0 * PI);
+    ok(
+        &mut s,
+        feature(
+            "rib",
+            &[("sketch", sketch_in(sk)), ("body", body_in())],
+            &[("thickness", 2.0), ("depth", 3.5), ("draft_deg", 0.0)],
+            &[("side", "right")],
+        ),
+    );
+    let (big, d) = (7.5f64, 7.0f64);
+    let segment = big * big * (d / big).acos() - d * (big * big - d * d).sqrt();
+    let rib = (PI / 2.0 * (big * big - 16.0) - segment) * 2.0;
+    assert_close(vol(&s, BodyId(1)), BOX + web + rib, 1e-6, "arc rib");
+}
+
+#[test]
+fn ribs_to_next_need_one_distance_along_the_curve() {
+    use std::f64::consts::PI;
+    let (mut s, _) = open_box();
+    // An arc over the flat floor is at varying distance from it.
+    let sk = arc_sketch(&mut s, SketchPlane::WorldXZ, [0.0, 15.0], 5.0, PI, 2.0 * PI);
+    let m = err(
+        &mut s,
+        feature(
+            "rib",
+            &[("sketch", sketch_in(sk)), ("body", body_in())],
+            &[("draft_deg", 0.0)],
+            &[("side", "right"), ("extent", "to_next")],
+        ),
+    );
+    assert!(m.contains("one depth"), "{m}");
 }

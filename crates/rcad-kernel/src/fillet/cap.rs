@@ -1233,7 +1233,8 @@ fn face_contains_origin(face: &Face, to2: &impl Fn(Point3) -> ([f64; 2], f64)) -
         let mut wind = 0i32;
         let mut pts: Vec<[f64; 2]> = Vec::new();
         for e in w.edge_iter() {
-            let c = e.curve();
+            // In the wire's direction (an edge may run against its curve).
+            let c = e.oriented_curve();
             let (t0, t1) = c.range_tuple();
             for k in 0..32 {
                 pts.push(to2(c.subs(t0 + (t1 - t0) * k as f64 / 32.0)).0);
