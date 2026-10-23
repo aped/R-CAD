@@ -9,6 +9,24 @@ which format versions a build reads and writes is listed in
 
 ### Added
 
+- **Plugins.** Feature types and analyses can come from plugins: built in, or installed as
+  external programs that answer JSON requests (`plugin.json` in the plugin search path, e.g. the
+  Python example `examples/plugins/vent-slots`). A plugin declares inputs, parameters and
+  choices; R-CAD resolves the inputs on every regeneration and applies the plugin's operations
+  through the same checked path as Extrude Join/Cut, so plugin geometry is exact and
+  result-checked. Plugin features are one history item with ordinary parameter slots, faces
+  later features can reference, and Edit Feature; a document naming a plugin that is not
+  installed opens with that feature failed by name and keeps it. Commands `list_plugins`,
+  `plugin_feature`, `set_plugin_data`, `run_plugin_analysis`; `rcad-cli plugins`. Native format
+  v10 (written only when used). See `docs/PLUGINS.md`, ADR 0016.
+- **Plastics** (built-in plugin; Autodesk Fusion's Plastic tab as the reference): plastic rules
+  (named nominal values that become parameters and bind new features, with material presets),
+  Boss (pilot/through holes, draft, gusset ribs, mating boss with clearance hole and
+  counterbore), Rib and Web (draft, to next), Snap Fit (hook and groove, hook and loop,
+  perpendicular or stand-off), Lip (lip, groove, lip and groove), Rest, and Design Advice
+  (thickness, variation, draft, undercuts, knife edges). See `docs/PLASTICS.md`.
+- Material catalog: PC, PC/ABS, PP, PA66, POM, HDPE.
+
 - **Optional sync server client.** R-CAD stays complete offline with no account; adding an
   account for a self-hosted server (protocol in `crates/rcad-cloud-proto`, documented routes,
   JSON over HTTPS) adds a Data panel with organizations, projects and folders, Save Version

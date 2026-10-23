@@ -12,7 +12,7 @@ ADR 0004 (format adapters).
 | Format | Import | Export | Geometry type | Units | Reachable through |
 |---|---|---|---|---|---|
 | Native `.rcad.json` v1, v2 | **yes** (migrated on load) | no | parametric history | mm | `Open` |
-| Native v1 to v9 (v1/v2 migrate on load) | **yes** | **yes** (v4 or the lowest later version that holds the document) | history + bodies + embedded import sources | mm | `Open` / `Save` |
+| Native v1 to v10 (v1/v2 migrate on load) | **yes** | **yes** (v4 or the lowest later version that holds the document) | history + bodies + embedded import sources | mm | `Open` / `Save` |
 | STEP `.step/.stp` (ISO 10303-21; entity subset, tested with AP214 files) | **yes, exact B-rep subset** | **yes**, exact B-rep, one solid per body | B-rep solid | declared unit honoured; override only when none is declared | `import_step`, `export_step`; UI Import…, Export STEP… |
 | STL `.stl` | **yes**, ASCII + binary | **yes**, binary | triangle mesh (mesh body) | none in file: unit choice required; export writes mm | `import_stl`, `export_stl` (print options: docs/PRINT_EXPORT.md); UI Import…, Export STL… |
 | DXF `.dxf` (ASCII) | **yes**, 2D sketch subset | **yes**, R12 LINE/ARC/CIRCLE | 2D sketch (unconstrained) | `$INSUNITS` honoured; choice required when absent | `import_dxf`, `export_dxf`; UI Import…, Export DXF (sketch)… |
@@ -268,11 +268,11 @@ stroke only), design intent (constraints); sketch placement on export.
 
 ## Native format
 
-**Versions.** This build reads every native version from v1 to v9 (`io::MIN_FORMAT_VERSION`,
+**Versions.** This build reads every native version from v1 to v10 (`io::MIN_FORMAT_VERSION`,
 `io::FORMAT_VERSION`) and refuses newer ones. A save writes the lowest version that holds the
 document (`io::required_version`), so a document that uses nothing newer stays readable by older
-builds; v9 is the newest. Each version's additions are listed by `io::v5_feature` …
-`io::v9_feature`, and a file whose label is older than a feature it contains is refused. v7 to v9
+builds; v10 is the newest. Each version's additions are listed by `io::v5_feature` …
+`io::v10_feature`, and a file whose label is older than a feature it contains is refused. v7 to v10
 in brief (the paragraphs after this list give the details of v3 to v6):
 
 - **v7**: nested assemblies, components without bodies, independent and external components,
@@ -287,6 +287,9 @@ in brief (the paragraphs after this list give the details of v3 to v6):
   sketch curves, prints of referenced imported faces, expressions on sheet-metal rules and
   flanges, driven sketch dimensions, concentric / collinear / symmetric sketch constraints
   (`io::v9_feature`).
+- **v10**: plugin features (`FeatureKind::Plugin`), references to faces of plugin features
+  (`FaceRole::Plugin`) and plugin document data (`Document.plugin_data`) (`io::v10_feature`;
+  docs/PLUGINS.md).
 
 Frozen documents of every version from v2 to v8 are in
 `crates/rcad-commands/tests/fixtures/native_v*/`; `native_formats.rs` opens each, checks its

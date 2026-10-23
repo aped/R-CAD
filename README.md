@@ -224,6 +224,7 @@ The roadmap is in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 | [`docs/UI.md`](docs/UI.md) | desktop app layout, menus and dialogs |
 | [`docs/CLOUD.md`](docs/CLOUD.md) | the optional sync server: what it adds, guarantees for offline use, client cache, CLI |
 | [`docs/CI.md`](docs/CI.md) | CI pipeline, gating, toolchain pin, release archives |
+| [`docs/PLUGINS.md`](docs/PLUGINS.md), [`docs/PLASTICS.md`](docs/PLASTICS.md) | plugins (built-in and external) and the plastics plugin |
 | [`docs/ASSEMBLIES.md`](docs/ASSEMBLIES.md), [`docs/DRAWINGS.md`](docs/DRAWINGS.md), [`docs/SHEET_METAL.md`](docs/SHEET_METAL.md), [`docs/MATERIALS.md`](docs/MATERIALS.md) | assemblies, drawings, sheet metal, materials (supported subsets) |
 | [`docs/adr/`](docs/adr) | architecture decisions |
 | [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md) | dependency licences |
