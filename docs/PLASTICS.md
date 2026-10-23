@@ -394,15 +394,16 @@ closed forms to 1e-6 relative, with point probes:
 - save and reload at v10, and a missing plugin.
 
 **Independent validation:** `tools/check_plastics.sh` exports to STEP:
-- bosses with gussets and with tip fillets;
+- bosses with gussets, with tip fillets and with root fillets;
 - a drafted rest;
-- a lip and groove;
+- a lip and groove, also drafted;
+- a two-sided draft;
 - a snap-fit groove;
 - a drafted box;
 - a web along an arc;
 - the enclosure example.
 
-FreeCAD (OpenCascade) reads each of the 11 bodies as one valid solid. Volumes agree with the
+FreeCAD (OpenCascade) reads each of the 15 bodies as one valid solid. Volumes agree with the
 closed forms within 2e-9 relative, and with R-CAD's own for the enclosure.
 
 **More command tests** (same directory): boss tip fillets against the cap-loop oracle, rib to

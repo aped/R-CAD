@@ -102,6 +102,29 @@ arc_sketch = {"cmd": "create_sketch", "plane": {"Face": face(2, "ExtrudeEndCap")
 cases["arc_web"] = (open_box + [arc_sketch,
     pf("web", {"sketch": sk(4)}, {"thickness": 2.0, "draft_deg": 0.0}, {"direction": "flip", "extent": "to_next"})],
     {1: BOX + math.pi / 2 * (11 ** 2 - 9 ** 2) * 18})
+# I. Bosses with root fillets (r 1): Pappus on the spandrel f^2 (1 - pi/4).
+f = 1.0
+ring = 2 * math.pi * (3 + f * (10 - 3 * math.pi) / (12 - 3 * math.pi)) * f * f * (1 - math.pi / 4)
+cases["boss_root"] = ([{"cmd": "new_document"}, rect("WorldXY", 60.0, 40.0), {"cmd": "extrude", "sketch": 1, "distance": 4.0},
+    pts({"Face": face(2, "ExtrudeEndCap")}, [(-15.0, 0.0), (15.0, 0.0)]),
+    pf("boss", {"sketch": sk(3)}, {"height": 8.0, "draft_deg": 0.0, "root_radius": f})],
+    {1: 9600 + 2 * (math.pi * 9 * 8 - math.pi * 1.25 ** 2 * 6 + ring)})
+# J. Drafted lip and groove (5 deg): band 184u + 4u^2 integrated over the height.
+t5 = math.tan(math.radians(5))
+band = lambda c, l: 184 * (c * l - t5 * l * l / 2) + 4 * (c ** 3 - (c - t5 * l) ** 3) / (3 * t5)
+cases["lip_drafted"] = (open_box + [rect({"Offset": {"base": "WorldXY", "distance": 20.0}}, 60.0, 40.0),
+    {"cmd": "extrude", "sketch": 4, "distance": 10.0},
+    {"cmd": "shell_face", "face": face(5, "ExtrudeStartCap"), "thickness": 2.0},
+    pf("lip", {"face": fc({"Face": face(2, "ExtrudeEndCap")}), "mate": fc({"Face": face(5, "ExtrudeStartCap")})},
+       {"width": 1.0, "height": 2.0, "clearance": 0.1, "draft_deg": 5.0}, {"type": "lip_and_groove"})],
+    {1: BOX + band(1.0, 2.0), 2: 24000 - 56 * 36 * 8 - band(1.1, 2.1)})
+# K. Two-sided draft (3 deg) about the mid-plane of a 40 x 30 x 20 box.
+area3 = lambda z: (40 - 2 * tt * z) * (30 - 2 * tt * z)
+cases["draft_two_sided"] = ([{"cmd": "new_document"}, rect("WorldXY", 40.0, 30.0), {"cmd": "extrude", "sketch": 1, "distance": 20.0},
+    pf("draft", {"faces": {"kind": "faces", "faces": [face(2, {"ExtrudeSide": {"entity": e}}) for e in range(1, 5)]},
+                 "fixed": fc({"Offset": {"base": {"Face": face(2, "ExtrudeStartCap")}, "distance": -10.0}})},
+       {"draft_deg": 3.0}, {"sides": "two_sides"})],
+    {1: 2 * 10 / 6 * (area3(0) + 4 * area3(5) + area3(10))})
 # E. The plastic enclosure example (no closed form: cross-check against R-CAD's volumes).
 ex = json.load(open(f"{repo}/examples/plastic_enclosure_workflow.json"))
 ex = [c for c in ex if c["cmd"] != "save"]
