@@ -2,6 +2,7 @@
 //! (docs/PLASTICS.md): closed-form volumes, point probes, parameter edits,
 //! rule bindings, refusals, undo and save/reload.
 mod boss;
+mod ribweb;
 
 use rcad_commands::plugins::PluginFeatureCmd;
 use rcad_commands::{Command, Response, Session, SketchTemplate};
