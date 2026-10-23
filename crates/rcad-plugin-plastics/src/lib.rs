@@ -7,6 +7,7 @@
 pub mod advice;
 pub mod analyses;
 mod boss;
+mod draft;
 mod lip;
 mod mesh_query;
 mod rest;
@@ -76,7 +77,7 @@ fn manifest() -> Manifest {
         version: env!("CARGO_PKG_VERSION").into(),
         api_version: rcad_plugin::API_VERSION,
         description: "Plastic part design: rules, boss, rib, web, snap fit, lip/groove, rest, \
-                      design advice, draft, accessibility and minimum radius analyses"
+                      draft, design advice, draft, accessibility and minimum radius analyses"
             .into(),
         features: vec![
             boss::schema(),
@@ -85,6 +86,7 @@ fn manifest() -> Manifest {
             snap::schema(),
             lip::schema(),
             rest::schema(),
+            draft::schema(),
         ],
         analyses: vec![
             advice::schema(),
@@ -109,6 +111,7 @@ impl Plugin for Plastics {
             "snap_fit" => snap::build(req),
             "lip" => lip::build(req),
             "rest" => rest::build(req),
+            "draft" => draft::build(req),
             f => Err(PluginError::NotFound(format!("plastics: no feature '{f}'"))),
         }
     }
@@ -195,7 +198,10 @@ mod tests {
             .iter()
             .map(|f| f.id.as_str())
             .collect();
-        assert_eq!(ids, ["boss", "rib", "web", "snap_fit", "lip", "rest"]);
+        assert_eq!(
+            ids,
+            ["boss", "rib", "web", "snap_fit", "lip", "rest", "draft"]
+        );
     }
 
     #[test]

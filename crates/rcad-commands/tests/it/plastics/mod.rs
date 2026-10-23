@@ -2,6 +2,7 @@
 //! (docs/PLASTICS.md): closed-form volumes, point probes, parameter edits,
 //! rule bindings, refusals, undo and save/reload.
 mod boss;
+mod draft;
 mod lip;
 mod rest;
 mod ribweb;

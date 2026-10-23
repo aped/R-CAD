@@ -200,6 +200,22 @@ pub enum Op {
         #[serde(default)]
         label: String,
     },
+    /// Replace planar face `index` of input `face` (a Face or Faces input,
+    /// as resolved for this build) by the plane through `origin` with outward
+    /// unit `normal`, keeping the body's topology: the kernel's exact face
+    /// replacement (docs/adr/0010: the face is a convex single loop of
+    /// straight edges, its neighbours planes, one side edge per vertex; the
+    /// result is checked by probes). Used for drafts of existing faces.
+    ReplaceFace {
+        id: u32,
+        face: String,
+        #[serde(default)]
+        index: u32,
+        origin: [f64; 3],
+        normal: [f64; 3],
+        #[serde(default)]
+        label: String,
+    },
 }
 
 fn yes() -> bool {
@@ -452,6 +468,39 @@ pub fn check_ops(req: &BuildRequest, ops: &[Op]) -> Result<(), PluginError> {
     let mut ids = std::collections::BTreeSet::new();
     let mut prisms = std::collections::BTreeSet::new();
     for op in ops {
+        if let Op::ReplaceFace {
+            id,
+            face,
+            index,
+            origin,
+            normal,
+            label,
+        } = op
+        {
+            let what = if label.is_empty() {
+                format!("{}: operation {id}", req.feature)
+            } else {
+                format!("{}: {label}", req.feature)
+            };
+            let bad = |m: &str| Err(PluginError::Failed(format!("{what}: {m}")));
+            if !ids.insert(*id) {
+                return bad("operation id repeated");
+            }
+            let n = match req.inputs.get(face) {
+                Some(Resolved::Face(_)) => 1,
+                Some(Resolved::Faces { faces }) => faces.len(),
+                _ => return bad(&format!("'{face}' is not a face input")),
+            };
+            if *index as usize >= n {
+                return bad(&format!("'{face}' has no face {index}"));
+            }
+            if !origin.iter().chain(normal).all(|v| v.is_finite())
+                || (geom::norm(*normal) - 1.0).abs() > 1e-9
+            {
+                return bad("the plane must be finite with a unit normal");
+            }
+            continue;
+        }
         if let Op::EdgeLoop {
             id,
             of,

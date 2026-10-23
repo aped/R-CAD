@@ -403,7 +403,7 @@ fn example_vent_slots_plugin_handles_depth_single_slots_and_refusals() {
             .unwrap()
             .iter()
             .map(|op| match op {
-                Op::Prism { id, .. } | Op::EdgeLoop { id, .. } => *id,
+                Op::Prism { id, .. } | Op::EdgeLoop { id, .. } | Op::ReplaceFace { id, .. } => *id,
             })
             .collect()
     };

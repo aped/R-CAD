@@ -316,6 +316,64 @@ pub(super) fn eval_plugin(
     }
     let mut tools = Vec::with_capacity(ops.len());
     for op in &ops {
+        if let rp::Op::ReplaceFace {
+            id: op_id,
+            face,
+            index,
+            origin,
+            normal,
+            label,
+        } = op
+        {
+            let what = if label.is_empty() {
+                format!("operation {op_id}")
+            } else {
+                label.clone()
+            };
+            let fg = match &req.inputs[face] {
+                rp::Resolved::Face(f) => f.clone(),
+                rp::Resolved::Faces { faces } => faces[*index as usize].clone(),
+                _ => unreachable!("checked by check_ops"),
+            };
+            let target = BodyId(fg.body);
+            let t = brep_target(st, id, target)?;
+            // The B-rep face is the one in the input's (original) plane with
+            // its normal: face replacement keeps topology and face order, so
+            // the other inputs' faces still match their planes.
+            let (o, n) = (fg.frame.origin, fg.frame.z);
+            let kinds = k::classify_faces(&t).map_err(kernel(id))?;
+            let hits: Vec<usize> = kinds
+                .iter()
+                .enumerate()
+                .filter_map(|(i, f)| match f {
+                    k::DirectFace::Plane { origin, normal }
+                        if dot(*normal, n) > 1.0 - 1e-9
+                            && dot(sub(*origin, o), n).abs() <= k::tol::FACE_MATCH =>
+                    {
+                        Some(i)
+                    }
+                    _ => None,
+                })
+                .collect();
+            let [fi] = hits.as_slice() else {
+                return Err(DocError::BrokenReference {
+                    from: id,
+                    detail: format!(
+                        "{what}: {} faces of {target} lie in the face's plane; refusing to guess",
+                        hits.len()
+                    ),
+                });
+            };
+            let out = k::replace_face(&t, *fi, *origin, *normal).map_err(|e| DocError::Kernel {
+                feature: id,
+                detail: format!("{what}: {e}"),
+            })?;
+            replace_body(st, id, target, out.body);
+            if r.body.is_none() {
+                r.body = Some(target);
+            }
+            continue;
+        }
         if let rp::Op::EdgeLoop {
             id: op_id,
             of,
