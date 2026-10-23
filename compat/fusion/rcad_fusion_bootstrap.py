@@ -2,11 +2,18 @@
 writes the recorded R-CAD commands as JSON.
 
     python3 -I rcad_fusion_bootstrap.py SCRIPT.py OUT.json
+    python3 -I rcad_fusion_bootstrap.py --addin REQUEST.json OUT.json
 
 Used by ``rcad-cli fusion-script``. The script is imported as a module and
 its ``run(context)`` is called (then ``stop(context)`` if it has one). OUT
 receives ``{"steps": [...]}`` or ``{"error": {"kind", "message",
 "traceback"}}``; the exit status is 0 or 1 accordingly.
+
+With ``--addin`` (``rcad-cli fusion-addin``), REQUEST is ``{"addin": DIR,
+"script": DIR/NAME.py, "list": bool, "command": ID or null, "inputs": [[ID,
+TEXT], ...], "base": SCRIPT or null}`` and the add-in is run by
+``adsk._addin``; OUT also gets ``"addin"`` (the command run) or ``"listing"``
+(the registered commands, with ``list``).
 """
 
 import importlib.util
@@ -65,13 +72,29 @@ def execute(script):
         return _error("python", "%s: %s" % (type(e).__name__, e), traceback.format_exc())
 
 
+def execute_addin(request_path):
+    try:
+        with open(request_path, encoding="utf-8") as f:
+            request = json.load(f)
+    except (OSError, ValueError) as e:
+        return _error("python", "cannot read the add-in request: %s" % e)
+    from adsk import _addin
+
+    return _addin.execute(request)
+
+
 def main(argv):
-    if len(argv) != 3:
-        sys.stderr.write("usage: rcad_fusion_bootstrap.py SCRIPT.py OUT.json\n")
+    if len(argv) == 4 and argv[1] == "--addin":
+        result = execute_addin(argv[2])
+        out = argv[3]
+    elif len(argv) == 3:
+        result = execute(argv[1])
+        out = argv[2]
+    else:
+        sys.stderr.write("usage: rcad_fusion_bootstrap.py [--addin REQUEST.json | SCRIPT.py] OUT.json\n")
         return 2
-    result = execute(argv[1])
     sys.stdout.flush()
-    with open(argv[2], "w", encoding="utf-8") as f:
+    with open(out, "w", encoding="utf-8") as f:
         json.dump(result, f)
     return 1 if "error" in result else 0
 

@@ -1,0 +1,13 @@
+{
+  "autodeskProduct": "Fusion",
+  "type": "addin",
+  "id": "4c1d7f0e-3b52-4a8e-9a0f-6b2f1c7e5d11",
+  "author": "R-CAD example",
+  "description": {
+    "": "A command that builds a shelled plastic box with a plastic rule, screw bosses and a web."
+  },
+  "version": "1.0.0",
+  "runOnStartup": false,
+  "supportedOS": "windows|mac|linux",
+  "editEnabled": true
+}

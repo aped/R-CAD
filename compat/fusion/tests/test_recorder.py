@@ -236,6 +236,8 @@ class Features(unittest.TestCase):
         self.assertEqual(c["params"]["hole_diameter"], 2.0)
         self.assertAlmostEqual(c["params"]["draft_deg"], 1.0, places=12)
         self.assertEqual(c["params"]["rib_count"], 4)
+        # rootRadius is mapped only as 0, which overrides a rule's nominal radius.
+        self.assertEqual(c["params"]["root_radius"], 0.0)
         self.assertEqual(
             boss["resolve"]["boss"],
             {"sketch": 3, "body": 1, "points": [[5.0, 5.0]], "offset": 10.0, "hole_full": False, "rib_offset": None},

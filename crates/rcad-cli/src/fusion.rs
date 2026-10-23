@@ -12,6 +12,9 @@
 //! by its height above the face it stands on, so the face under each point is found
 //! along the sketch normal and checked by point membership.
 //!
+//! The temporary package, running the bootstrap and executing the recorded steps are
+//! shared with `rcad-cli fusion-addin` (`fusion_addin.rs`).
+//!
 //! Exit status: 0 success; 1 the script failed (Python error, unsupported member) or a
 //! step was refused; 2 the script or an output file could not be read or written, or
 //! Python is missing; 64 usage.
@@ -19,6 +22,7 @@ use crate::out::{esay, say};
 use rcad_commands::{Command, Session};
 use serde::Deserialize;
 use serde_json::Value;
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -48,12 +52,16 @@ const PACKAGE: &[(&str, &str)] = &[
         "adsk/cam.py",
         include_str!("../../../compat/fusion/adsk/cam.py"),
     ),
+    (
+        "adsk/_addin.py",
+        include_str!("../../../compat/fusion/adsk/_addin.py"),
+    ),
 ];
 
 /// One recorded step: the command, the feature and body ids the recorder predicts it
 /// creates, and values to resolve against the model before it runs.
 #[derive(Deserialize)]
-struct Step {
+pub(crate) struct Step {
     command: Value,
     #[serde(default)]
     feature: Option<u32>,
@@ -85,12 +93,18 @@ struct BossResolve {
     rib_offset: Option<f64>,
 }
 
+/// What the bootstrap wrote: the recorded steps (or an error), and for an add-in the
+/// command it ran (`addin`) or the registered commands (`listing`).
 #[derive(Deserialize)]
-struct Recorded {
+pub(crate) struct Recorded {
     #[serde(default)]
-    steps: Vec<Step>,
+    pub(crate) steps: Vec<Step>,
     #[serde(default)]
     error: Option<ScriptError>,
+    #[serde(default)]
+    pub(crate) listing: Option<Value>,
+    #[serde(default)]
+    pub(crate) addin: Option<Value>,
 }
 
 #[derive(Deserialize)]
@@ -168,22 +182,52 @@ pub fn run(args: &[String]) -> ExitCode {
         esay!("cannot read {}: not a file", script.display());
         return ExitCode::from(2);
     }
-    let steps = match record(&script) {
-        Ok(s) => s,
+    let recorded =
+        Bootstrap::new().and_then(|b| b.run("fusion-script", &[script.as_os_str()], &script));
+    let steps = match recorded {
+        Ok(r) => r.steps,
         Err(code) => return code,
     };
     crate::load_plugins();
-    execute(steps, out.as_deref(), commands.as_deref())
+    execute("fusion-script", steps, out.as_deref(), commands.as_deref())
 }
 
-/// Run the script under Python and return the recorded steps.
-fn record(script: &Path) -> Result<Vec<Step>, ExitCode> {
-    let tmp = TempDir::new().map_err(|e| {
-        esay!("cannot create a temporary directory: {e}");
-        ExitCode::from(2)
-    })?;
+/// The `adsk` package and the bootstrap, written to a private temporary directory.
+pub(crate) struct Bootstrap {
+    tmp: TempDir,
+}
+
+impl Bootstrap {
+    pub(crate) fn new() -> Result<Bootstrap, ExitCode> {
+        let tmp = TempDir::new().map_err(|e| {
+            esay!("cannot create a temporary directory: {e}");
+            ExitCode::from(2)
+        })?;
+        write_package(&tmp.0)?;
+        Ok(Bootstrap { tmp })
+    }
+
+    /// The temporary directory (for request files).
+    pub(crate) fn dir(&self) -> &Path {
+        &self.tmp.0
+    }
+
+    /// Run the bootstrap with `args` (before its result path) and return what it
+    /// recorded. `source` is the user's Python file, whose lines are shown for an
+    /// unsupported member; `tool` prefixes the messages.
+    pub(crate) fn run(
+        &self,
+        tool: &str,
+        args: &[&OsStr],
+        source: &Path,
+    ) -> Result<Recorded, ExitCode> {
+        record(&self.tmp.0, tool, args, source)
+    }
+}
+
+fn write_package(dir: &Path) -> Result<(), ExitCode> {
     for (rel, text) in PACKAGE {
-        let p = tmp.0.join(rel);
+        let p = dir.join(rel);
         let written = p
             .parent()
             .map_or(Ok(()), std::fs::create_dir_all)
@@ -193,12 +237,17 @@ fn record(script: &Path) -> Result<Vec<Step>, ExitCode> {
             return Err(ExitCode::from(2));
         }
     }
-    let result_path = tmp.0.join("recorded.json");
+    Ok(())
+}
+
+/// Run the bootstrap under Python and return what it recorded.
+fn record(dir: &Path, tool: &str, args: &[&OsStr], source: &Path) -> Result<Recorded, ExitCode> {
+    let result_path = dir.join("recorded.json");
     let python = std::env::var_os("RCAD_PYTHON").unwrap_or_else(|| "python3".into());
     let output = std::process::Command::new(&python)
         .arg("-I")
-        .arg(tmp.0.join("rcad_fusion_bootstrap.py"))
-        .arg(script)
+        .arg(dir.join("rcad_fusion_bootstrap.py"))
+        .args(args)
         .arg(&result_path)
         .stdin(std::process::Stdio::null())
         .output();
@@ -206,8 +255,8 @@ fn record(script: &Path) -> Result<Vec<Step>, ExitCode> {
         Ok(o) => o,
         Err(e) => {
             esay!(
-                "cannot run {}: {e} (fusion-script needs Python 3; set RCAD_PYTHON to choose \
-                 the interpreter)",
+                "cannot run {}: {e} ({tool} needs Python 3; set RCAD_PYTHON to choose the \
+                 interpreter)",
                 python.to_string_lossy()
             );
             return Err(ExitCode::from(2));
@@ -228,28 +277,28 @@ fn record(script: &Path) -> Result<Vec<Step>, ExitCode> {
         Ok(r) => r,
         Err(e) => {
             esay!(
-                "fusion-script: Python exited with {} without a result ({e})",
+                "{tool}: Python exited with {} without a result ({e})",
                 output.status
             );
             return Err(ExitCode::FAILURE);
         }
     };
-    if let Some(err) = recorded.error {
-        report_error(&err, script);
+    if let Some(err) = &recorded.error {
+        report_error(tool, err, source);
         return Err(ExitCode::FAILURE);
     }
     if !output.status.success() {
-        esay!("fusion-script: Python exited with {}", output.status);
+        esay!("{tool}: Python exited with {}", output.status);
         return Err(ExitCode::FAILURE);
     }
-    Ok(recorded.steps)
+    Ok(recorded)
 }
 
-fn report_error(err: &ScriptError, script: &Path) {
+fn report_error(tool: &str, err: &ScriptError, script: &Path) {
     match err.kind.as_str() {
-        "not_supported" => esay!("fusion-script: not supported: {}", err.message),
-        "script" => esay!("fusion-script: {}", err.message),
-        _ => esay!("fusion-script: Python error: {}", err.message),
+        "not_supported" => esay!("{tool}: not supported: {}", err.message),
+        "script" | "addin" => esay!("{tool}: {}", err.message),
+        _ => esay!("{tool}: Python error: {}", err.message),
     }
     if err.traceback.is_empty() {
         return;
@@ -271,7 +320,14 @@ fn report_error(err: &ScriptError, script: &Path) {
     }
 }
 
-fn execute(steps: Vec<Step>, out: Option<&Path>, commands: Option<&Path>) -> ExitCode {
+/// Execute recorded steps in a new session, printing one JSON line per step; write the
+/// commands to `commands` and save the document to `out` as asked.
+pub(crate) fn execute(
+    tool: &str,
+    steps: Vec<Step>,
+    out: Option<&Path>,
+    commands: Option<&Path>,
+) -> ExitCode {
     let mut session = Session::new();
     let mut resolved: Vec<Value> = Vec::with_capacity(steps.len());
     let mut failed = false;
@@ -284,7 +340,7 @@ fn execute(steps: Vec<Step>, out: Option<&Path>, commands: Option<&Path>) -> Exi
         if let Some(b) = step.resolve.as_ref().and_then(|r| r.boss.as_ref())
             && let Err(e) = resolve_boss(&session, b, &mut value)
         {
-            esay!("fusion-script: step {i}: {e}");
+            esay!("{tool}: step {i}: {e}");
             failed = true;
             resolved.push(value);
             continue;
@@ -292,7 +348,7 @@ fn execute(steps: Vec<Step>, out: Option<&Path>, commands: Option<&Path>) -> Exi
         let cmd: Command = match serde_json::from_value(value.clone()) {
             Ok(c) => c,
             Err(e) => {
-                esay!("fusion-script: step {i}: the recorder produced an invalid command: {e}");
+                esay!("{tool}: step {i}: the recorder produced an invalid command: {e}");
                 failed = true;
                 resolved.push(value);
                 continue;
@@ -339,7 +395,7 @@ fn execute(steps: Vec<Step>, out: Option<&Path>, commands: Option<&Path>) -> Exi
             serde_json::json!({ "step": i, "as_expected": ok, "response": r })
         );
         if let Some(p) = problem {
-            esay!("fusion-script: step {i}: {p}");
+            esay!("{tool}: step {i}: {p}");
             failed = true;
         }
     }

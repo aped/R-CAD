@@ -145,6 +145,18 @@ class Design(Base):
         if value != DesignTypes.ParametricDesignType:
             raise NotSupported("R-CAD designs are parametric (DesignTypes.DirectDesignType)")
 
+    @property
+    def unitsManager(self):
+        return FusionUnitsManager()
+
+    @property
+    def fusionUnitsManager(self):
+        return FusionUnitsManager()
+
+
+class FusionUnitsManager(core.UnitsManager):
+    _module = "adsk.fusion"
+
 
 def _reset():
     pass
@@ -737,6 +749,7 @@ class Feature(Base):
     def __init__(self, fid):
         self._id = fid
         self._name = None
+        _rec().api_features.append(self)
 
     @property
     def name(self):
@@ -1473,7 +1486,9 @@ class BossFeatures(Collection):
             raise NotSupported(
                 "the boss sketch must lie on a face of a body or on a plane offset from one"
             )
-        params, exprs = {}, {}
+        # rootRadius is accepted only as 0: say so, since R-CAD's boss otherwise takes
+        # its root fillet from the plastic rule's nominal radius (NR).
+        params, exprs = {"root_radius": 0.0}, {}
         for member, (slot, kind) in BossFeatureSideInput._MAP.items():
             vi = side._v.get(member)
             if vi is None or slot is None:
