@@ -43,6 +43,12 @@ which format versions a build reads and writes is listed in
   commands, converting from centimetres and radians and binding parameter expressions. The
   CLI then executes them like `run`. Members outside the subset fail by name. See
   `docs/FUSION_SCRIPTS.md` and the examples in `compat/fusion/examples`.
+- **Fusion-style add-ins, headless.** `rcad-cli fusion-addin ADDIN_DIR [--list] [--command ID]
+  [--input ID=VALUE ...] [--base SCRIPT.py]` checks the add-in's manifest, calls its `run`, and
+  runs one of its commands without a user interface: command definitions, events and handlers,
+  value, boolean, integer, drop-down, string, text and selection inputs, validation, a discarded
+  preview, then `execute` and `stop`. `--list` prints the commands and their inputs as JSON.
+  Example: `compat/fusion/examples/addins/PlasticBoxAddin`.
 
 - **Optional sync server client.** R-CAD stays complete offline with no account; adding an
   account for a self-hosted server (protocol in `crates/rcad-cloud-proto`, documented routes,

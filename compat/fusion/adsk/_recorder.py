@@ -285,6 +285,7 @@ class Recorder:
         self.script_error = None
         self.sketches = []  # sketch data objects, for flushing
         self.bodies = []  # BRepBody objects, in creation order
+        self.api_features = []  # Feature objects, in creation order (selection inputs)
         self.plastics = None  # set by adsk.fusion (design rules state)
         self.steps.append({"command": {"cmd": "new_document"}})
 
