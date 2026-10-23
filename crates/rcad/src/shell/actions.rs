@@ -79,6 +79,16 @@ impl RcadApp {
         }
     }
 
+    /// A solid (B-rep) body exists (no selection needed).
+    pub(crate) fn need_solid(&self) -> Result<(), String> {
+        self.need_open()?;
+        if self.summary.bodies.iter().any(|b| b.kind == "brep") {
+            Ok(())
+        } else {
+            Err("Needs a solid body".into())
+        }
+    }
+
     pub(crate) fn need_mesh_body(&self) -> Result<(), String> {
         self.need_body()?;
         let b = self

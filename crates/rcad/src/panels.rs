@@ -401,7 +401,10 @@ impl RcadApp {
                 });
             }
             let sel = self.selected == Some(f.id);
+            // A plugin feature shows its type's name ("Boss").
+            let plugin_kind = crate::plugin_ui::feature_type_name(f);
             let kind = match f.kind.as_str() {
+                _ if plugin_kind.is_some() => plugin_kind.as_deref().unwrap_or_default(),
                 "sketch" => "Sketch",
                 "extrude" => "Extrude",
                 "revolve" => "Revolve",
@@ -634,6 +637,11 @@ impl RcadApp {
             }
             Dialog::ShellFace { face, .. } | Dialog::FilletLoop { face, .. } => *face = r,
             Dialog::Align { from, to } if r != *from => *to = Some(r),
+            Dialog::PluginFeature(f) => {
+                if !f.take_pick(r) {
+                    return;
+                }
+            }
             _ => return,
         }
         self.shell.pick_armed = false;
@@ -1774,7 +1782,7 @@ impl RcadApp {
         let form_id = dlg.title();
         let title = match self.shell.editing {
             Some(f) => format!("Edit {}", self.feature_name(f)),
-            None => dlg.title().to_string(),
+            None => dlg.display_title(),
         };
         // Docked at the right edge of the canvas, under the ribbon (Fusion's
         // command-dialog position); one dialog at a time.
@@ -2093,6 +2101,9 @@ impl RcadApp {
                         self.shell_form_ui(ui, *extrude, open_end, thickness);
                     }
                     Dialog::DirectEdit(f) => f.ui(ui),
+                    Dialog::PluginFeature(f) => {
+                        ok_allowed &= self.plugin_form_ui(ui, f);
+                    }
                     Dialog::Chamfer {
                         a,
                         b,
@@ -2302,6 +2313,17 @@ impl RcadApp {
                     });
                 });
             });
+        // A dialog whose content grew (a scroll area inside an auto-sized
+        // window grows over several frames) keeps repainting until its size
+        // settles, so OK is never left below the window edge.
+        if let Some(d) = &dock {
+            let key = egui::Id::new("rcad_dialog_size");
+            let size = d.response.rect.size();
+            if ctx.data(|x| x.get_temp::<egui::Vec2>(key)) != Some(size) {
+                ctx.data_mut(|x| x.insert_temp(key, size));
+                ctx.request_repaint();
+            }
+        }
         // Remember a width the user dragged (not every layout jitter).
         let w = dock.map_or(width, |d| d.response.rect.width());
         if (w - width).abs() > 4.0 && w <= 640.0 && !ctx.input(|i| i.pointer.any_down()) {
@@ -2694,11 +2716,31 @@ fn field(ui: &mut egui::Ui, label: &str, buf: &mut String, width: f32) {
 /// checked against the document's parameters, red with the reason when it
 /// does not evaluate).
 fn field_checked(ui: &mut egui::Ui, label: &str, buf: &mut String, width: f32, numeric: bool) {
+    let kind = numeric.then(|| crate::dialogs::slot_of(label));
+    field_of_kind(ui, label, buf, width, kind);
+}
+
+/// A value field of an explicit quantity kind (plugin parameters).
+pub(crate) fn num_field_as(
+    ui: &mut egui::Ui,
+    label: &str,
+    buf: &mut String,
+    kind: rcad_document::SlotKind,
+) -> egui::Response {
+    field_of_kind(ui, label, buf, 90.0, Some(kind))
+}
+
+fn field_of_kind(
+    ui: &mut egui::Ui,
+    label: &str,
+    buf: &mut String,
+    width: f32,
+    kind: Option<rcad_document::SlotKind>,
+) -> egui::Response {
     // Empty is left to the command (optional fields such as the facet angle).
-    let err = if numeric && !buf.trim().is_empty() {
-        crate::dialogs::check_value(label, buf).err()
-    } else {
-        None
+    let err = match kind {
+        Some(k) if !buf.trim().is_empty() => crate::dialogs::check_value_as(k, buf).err(),
+        _ => None,
     };
     ui.horizontal(|ui| {
         let l = crate::form::label(ui, label);
@@ -2710,11 +2752,15 @@ fn field_checked(ui: &mut egui::Ui, label: &str, buf: &mut String, width: f32, n
         if AUTOFOCUS.with(|a| a.replace(false)) {
             r.request_focus();
         }
-        if let Some(e) = &err {
-            crate::dialogs::note_invalid(label, e, r.lost_focus());
-            r.on_hover_text(e.as_str());
+        match &err {
+            Some(e) => {
+                crate::dialogs::note_invalid(label, e, r.lost_focus());
+                r.on_hover_text(e.as_str())
+            }
+            None => r,
         }
-    });
+    })
+    .inner
 }
 
 pub(crate) fn num_field(ui: &mut egui::Ui, label: &str, buf: &mut String) {

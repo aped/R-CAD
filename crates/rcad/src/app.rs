@@ -225,6 +225,9 @@ pub(crate) enum Dialog {
     },
     /// Direct edit of an imported body (crate::direct_edit_ui).
     DirectEdit(crate::direct_edit_ui::DirectForm),
+    /// A feature of a plugin (generic, from its manifest;
+    /// crate::plugin_ui::feature).
+    PluginFeature(crate::plugin_ui::feature::PluginForm),
 }
 
 /// The pattern dialog's mode.
@@ -272,6 +275,15 @@ impl Dialog {
             Dialog::Shell { .. } => "Shell (scoped)",
             Dialog::OffsetPlane { .. } => "Sketch on offset plane",
             Dialog::DirectEdit(f) => f.title(),
+            Dialog::PluginFeature(_) => "Plugin feature",
+        }
+    }
+
+    /// The window title: [`Dialog::title`], or a plugin feature's name.
+    pub(crate) fn display_title(&self) -> String {
+        match self {
+            Dialog::PluginFeature(f) => f.name.clone(),
+            d => d.title().to_string(),
         }
     }
 }
@@ -553,6 +565,8 @@ pub struct RcadApp {
     pending_new_sketch: bool,
     /// Shell view state (keymap layer, section focus requests).
     pub(crate) shell: crate::shell::ShellState,
+    /// Installed plugins, the document's plugin data, plugin windows.
+    pub(crate) plugins: crate::plugin_ui::PluginUi,
     /// Optional cloud tier (Data panel, cloud versions); idle without an account.
     #[cfg(feature = "cloud")]
     pub(crate) cloud: crate::cloud_ui::CloudUi,
@@ -651,6 +665,7 @@ impl RcadApp {
             frame_ema: None,
             pending_new_sketch: false,
             shell: Default::default(),
+            plugins: crate::plugin_ui::PluginUi::new(),
             #[cfg(feature = "cloud")]
             cloud: Default::default(),
         }
@@ -1183,8 +1198,10 @@ impl RcadApp {
             summary,
             measurements,
             mesh,
+            plugin_data,
             ..
         } = r;
+        self.plugins.on_reply(&command, &response, plugin_data);
         let doc_changed = summary.doc_id != self.summary.doc_id;
         // A superseded edit was skipped by the worker because a newer edit of the
         // same parameter is queued; its summary is not a result. Keep the user's
@@ -1281,6 +1298,7 @@ impl RcadApp {
                 self.dialog = None;
             }
             self.import_summary = None;
+            self.plugins.document_changed();
         }
         // A sketch session belongs to one document; a different document
         // (Open/New/Close completed) ends it without committing.
@@ -1523,6 +1541,7 @@ impl RcadApp {
                 (vec![face.feature], vec![])
             }
             Dialog::DirectEdit(f) => (f.refs(), vec![]),
+            Dialog::PluginFeature(f) => f.refs(),
             Dialog::Shell { extrude, .. } => (vec![*extrude], vec![]),
             Dialog::OffsetPlane { face, .. } => {
                 (face.iter().map(|(r, _)| r.feature).collect(), vec![])
@@ -2457,6 +2476,7 @@ impl RcadApp {
         self.section_window(&ctx);
         self.import_summary_ui(&ctx);
         self.reattach_ui(&ctx);
+        self.plugin_windows(&ctx);
         if busy || self.summary.measuring {
             ctx.request_repaint_after(Duration::from_millis(50));
         }
@@ -2755,6 +2775,7 @@ pub(crate) fn build_command(d: &Dialog) -> Result<Command, String> {
             return Err("an offset plane starts a sketch session (no command)".into());
         }
         Dialog::DirectEdit(f) => f.command()?,
+        Dialog::PluginFeature(f) => f.command()?,
         Dialog::Shell {
             extrude,
             open_end,
@@ -2983,6 +3004,7 @@ pub(crate) fn built_from_pick(d: &Dialog) -> bool {
         | Dialog::FilletLoop { .. }
         | Dialog::Align { .. }
         | Dialog::DirectEdit(_) => true,
+        Dialog::PluginFeature(f) => f.uses_faces(),
         Dialog::Pattern { mirror_face, .. } => mirror_face.is_some(),
         Dialog::Thread { plane, .. } => matches!(plane, SketchPlane::Face(_)),
         _ => false,
@@ -3109,6 +3131,7 @@ mod tests {
             measurements: None,
             mesh: MeshUpdate::Unchanged,
             followup: true,
+            plugin_data: Default::default(),
         });
         let body = |id| app.summary.bodies.iter().find(|b| b.id == id).unwrap();
         assert!(body(good).measurements.is_some());

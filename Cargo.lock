@@ -2501,6 +2501,8 @@ dependencies = [
  "rcad-document",
  "rcad-exchange",
  "rcad-kernel",
+ "rcad-plugin",
+ "rcad-plugin-plastics",
  "rcad-sketch",
  "rcad-viewport",
  "rfd",

@@ -38,6 +38,7 @@ mod parameters_ui;
 mod pattern_grid_ui;
 mod pick_semantic;
 mod placement;
+mod plastics_ui;
 mod polish_ui;
 mod preview_regen;
 mod print_export_ui;

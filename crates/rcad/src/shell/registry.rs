@@ -136,6 +136,18 @@ pub enum CmdId {
     SheetBase,
     SurfacePatch,
     SurfaceExtrude,
+    // PLASTIC (the built-in plastics plugin)
+    PlasticRules,
+    PlasticAssignRule,
+    PlasticBoss,
+    PlasticRib,
+    PlasticWeb,
+    PlasticSnapFit,
+    PlasticLip,
+    PlasticRest,
+    DesignAdvice,
+    // UTILITIES ▸ PLUGINS
+    Plugins,
 }
 
 /// Ribbon tab.
@@ -145,15 +157,17 @@ pub enum Tab {
     Surface,
     Mesh,
     SheetMetal,
+    Plastic,
     Utilities,
 }
 
 impl Tab {
-    pub const ALL: [Tab; 5] = [
+    pub const ALL: [Tab; 6] = [
         Tab::Solid,
         Tab::Surface,
         Tab::Mesh,
         Tab::SheetMetal,
+        Tab::Plastic,
         Tab::Utilities,
     ];
     pub fn label(self) -> &'static str {
@@ -162,6 +176,7 @@ impl Tab {
             Tab::Surface => "SURFACE",
             Tab::Mesh => "MESH",
             Tab::SheetMetal => "SHEET METAL",
+            Tab::Plastic => "PLASTIC",
             Tab::Utilities => "UTILITIES",
         }
     }
@@ -172,6 +187,9 @@ impl Tab {
             Tab::Surface => "Surfaces from sketches: patches and extruded surfaces",
             Tab::Mesh => "Mesh bodies (STL, 3MF): repair and edit",
             Tab::SheetMetal => "Sheet metal: base faces and flanges",
+            Tab::Plastic => {
+                "Plastic parts: rules, bosses, ribs, webs, snap fits, lips, rests, design advice"
+            }
             Tab::Utilities => "Parameters and export for printing (STL, 3MF)",
         }
     }
@@ -180,6 +198,7 @@ impl Tab {
 /// Ribbon group (order of declaration = order on the tab).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Group {
+    Setup,
     Create,
     Modify,
     Assemble,
@@ -190,11 +209,13 @@ pub enum Group {
     Select,
     Prepare,
     Make,
+    Plugins,
 }
 
 impl Group {
     pub fn label(self) -> &'static str {
         match self {
+            Group::Setup => "SETUP",
             Group::Create => "CREATE",
             Group::Modify => "MODIFY",
             Group::Assemble => "ASSEMBLE",
@@ -205,6 +226,7 @@ impl Group {
             Group::Select => "SELECT",
             Group::Prepare => "PREPARE",
             Group::Make => "MAKE",
+            Group::Plugins => "PLUGINS",
         }
     }
 }
@@ -290,6 +312,16 @@ pub enum Icon {
     View,
     Help,
     Generic,
+    // Plastic part features and the plugin glyph.
+    Rules,
+    Boss,
+    Rib,
+    Web,
+    SnapFit,
+    Lip,
+    Rest,
+    Advice,
+    Plugin,
 }
 
 pub type Enabled = fn(&RcadApp) -> Result<(), String>;
@@ -357,6 +389,9 @@ const S_INSPECT_MORE: Place = ribbon(Tab::Solid, Group::Inspect, false);
 const S_INSERT: Place = ribbon(Tab::Solid, Group::Insert, true);
 const S_INSERT_MORE: Place = ribbon(Tab::Solid, Group::Insert, false);
 const S_SELECT: Place = ribbon(Tab::Solid, Group::Select, true);
+const P_SETUP: Place = ribbon(Tab::Plastic, Group::Setup, true);
+const P_CREATE: Place = ribbon(Tab::Plastic, Group::Create, true);
+const P_INSPECT: Place = ribbon(Tab::Plastic, Group::Inspect, true);
 
 fn always(_: &RcadApp) -> Result<(), String> {
     Ok(())
@@ -832,6 +867,51 @@ pub static COMMANDS: &[CommandDef] = &[
         fusion: [], classic: [],
         places: [ribbon(Tab::Surface, Group::Create, true)], mm: None,
         enabled: |a| a.need_selected_sketch(), run: |a| a.focus(Focus::SurfaceFromSketch)),
+    // ----- PLASTIC (plastics plugin; the dialogs are the generic plugin ones) -----
+    def!(PlasticRules, "Manage Plastic Rules…", Rules,
+        "Named sets of wall thickness, draft and other nominal values that features on a body follow",
+        fusion: [], classic: [],
+        places: [P_SETUP], mm: None,
+        enabled: open, run: |a| a.open_plastic_rules()),
+    def!(PlasticAssignRule, "Assign Plastic Rule…", Material,
+        "Put a body under a plastic rule (its material and feature defaults)",
+        fusion: [], classic: [],
+        places: [P_SETUP], mm: None,
+        enabled: |a| a.need_solid(), run: |a| a.open_assign_rule()),
+    def!(PlasticBoss, "Boss…", Boss, "Screw bosses at the points of a sketch, with holes and gusset ribs",
+        fusion: [], classic: [],
+        places: [P_CREATE], mm: None,
+        enabled: |a| a.need_sketch(), run: |a| a.open_plugin_feature("plastics", "boss")),
+    def!(PlasticRib, "Rib…", Rib, "Thin wall grown in the sketch plane from open sketch lines",
+        fusion: [], classic: [],
+        places: [P_CREATE], mm: None,
+        enabled: |a| a.need_sketch(), run: |a| a.open_plugin_feature("plastics", "rib")),
+    def!(PlasticWeb, "Web…", Web, "Network of thin walls along the sketch normal from open sketch lines",
+        fusion: [], classic: [],
+        places: [P_CREATE], mm: None,
+        enabled: |a| a.need_sketch(), run: |a| a.open_plugin_feature("plastics", "web")),
+    def!(PlasticSnapFit, "Snap Fit…", SnapFit, "Cantilever hooks at sketch points, with an optional mating catch",
+        fusion: [], classic: [],
+        places: [P_CREATE], mm: None,
+        enabled: |a| a.need_sketch(), run: |a| a.open_plugin_feature("plastics", "snap_fit")),
+    def!(PlasticLip, "Lip…", Lip, "Lip and/or groove along the rim face of a shelled part",
+        fusion: [], classic: [],
+        places: [P_CREATE], mm: None,
+        enabled: |a| a.need_solid(), run: |a| a.open_plugin_feature("plastics", "lip")),
+    def!(PlasticRest, "Rest…", Rest, "Flat platform with uniform walls inside a shelled part",
+        fusion: [], classic: [],
+        places: [P_CREATE], mm: None,
+        enabled: |a| a.need_sketch(), run: |a| a.open_plugin_feature("plastics", "rest")),
+    def!(DesignAdvice, "Design Advice…", Advice,
+        "Wall thickness, draft, undercuts and knife edges of a body for a pull direction",
+        fusion: [], classic: [],
+        places: [P_INSPECT], mm: None,
+        enabled: |a| a.need_solid(), run: |a| a.open_plugin_analysis("plastics", "design_advice")),
+    // ----- UTILITIES ▸ PLUGINS -----
+    def!(Plugins, "Plugins…", Plugin, "Installed plugins: versions, features and analyses",
+        fusion: [], classic: [],
+        places: [ribbon(Tab::Utilities, Group::Plugins, true)], mm: None,
+        enabled: always, run: |a| a.open_plugins_window()),
 ];
 
 /// The definition of `id`.
@@ -1023,6 +1103,16 @@ mod tests {
         CmdId::SheetBase,
         CmdId::SurfacePatch,
         CmdId::SurfaceExtrude,
+        CmdId::PlasticRules,
+        CmdId::PlasticAssignRule,
+        CmdId::PlasticBoss,
+        CmdId::PlasticRib,
+        CmdId::PlasticWeb,
+        CmdId::PlasticSnapFit,
+        CmdId::PlasticLip,
+        CmdId::PlasticRest,
+        CmdId::DesignAdvice,
+        CmdId::Plugins,
     ];
 
     #[test]
