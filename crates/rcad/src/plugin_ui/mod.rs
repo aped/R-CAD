@@ -1,7 +1,9 @@
 //! Plugins in the app (docs/PLUGINS.md, docs/UI.md "Plugins"): the generic
 //! plugin feature dialog ([`feature`]), the generic analysis window
-//! ([`analysis`]), the Plugins window listing what is installed, and the
-//! plastic rules windows ([`plastic_rules`], the one plugin-specific part).
+//! ([`analysis`]) with its viewport colour map ([`colour_map`]), the
+//! Plugins window listing what is installed, the plastic rules windows
+//! ([`plastic_rules`], the one plugin-specific part), and the rule binding
+//! of core feature dialogs ([`core_rules`]).
 //!
 //! Everything here reads plugin manifests; no feature is known by name
 //! except through the PLASTIC ribbon tab's commands. The installed plugins
@@ -10,6 +12,8 @@
 //! arrives with every engine reply ([`crate::engine::Reply::plugin_data`]).
 
 pub mod analysis;
+pub mod colour_map;
+pub mod core_rules;
 pub mod feature;
 pub mod plastic_rules;
 
@@ -22,7 +26,7 @@ use rcad_document::{BodyId, FeatureKind};
 use rcad_plugin::ParamKind;
 
 use crate::app::RcadApp;
-use crate::engine::PluginData;
+use crate::engine::{AnalysisMesh, PluginData};
 use crate::probe::Probe as _;
 
 /// Rule symbols of one (plugin, body, revision), so a dialog does not ask
@@ -31,6 +35,7 @@ use crate::probe::Probe as _;
 struct RuleCache {
     plugin: String,
     body: Option<BodyId>,
+    component: Option<u32>,
     revision: u64,
     doc_id: u64,
     symbols: BTreeMap<String, String>,
@@ -52,6 +57,13 @@ pub struct PluginUi {
     pub rules: Option<plastic_rules::RulesForm>,
     pub assign: Option<plastic_rules::AssignForm>,
     pub analysis: Option<analysis::AnalysisForm>,
+    /// The analysis colour map shown on the model (a derived display).
+    pub colour_map: Option<colour_map::ColourMap>,
+    /// The "Use plastic rule" choice of the open core feature dialog.
+    pub core_rule: Option<core_rules::CoreRuleUse>,
+    /// Request token of a core feature creation to bind to its body's rule
+    /// once it succeeds (`BindRuleParameters`).
+    pub bind_after: Option<u64>,
     rule_cache: Option<RuleCache>,
 }
 
@@ -71,7 +83,13 @@ impl PluginUi {
 
     /// Reply bookkeeping: the document's plugin data, the plugin list, and
     /// the results the open windows wait for.
-    pub(crate) fn on_reply(&mut self, cmd: &Command, r: &Response, data: PluginData) {
+    pub(crate) fn on_reply(
+        &mut self,
+        cmd: &Command,
+        r: &Response,
+        data: PluginData,
+        mesh: Option<AnalysisMesh>,
+    ) {
         self.data = data;
         match cmd {
             Command::ListPlugins => {
@@ -110,6 +128,10 @@ impl PluginUi {
                         (Some(rep), true) => Ok(rep.clone()),
                         _ => Err(error_text(r)),
                     });
+                    f.mesh = mesh;
+                    f.map_error = None;
+                    // A new report replaces the map of the previous one.
+                    self.colour_map = None;
                 }
             }
             _ => {}
@@ -121,7 +143,22 @@ impl PluginUi {
         self.rules = None;
         self.assign = None;
         self.analysis = None;
+        self.colour_map = None;
+        self.core_rule = None;
+        self.bind_after = None;
         self.rule_cache = None;
+    }
+
+    /// The colour map belongs to one model state: dropped when the model
+    /// changes (any revision or document change).
+    pub(crate) fn model_state(&mut self, doc_id: u64, revision: u64) {
+        if self
+            .colour_map
+            .as_ref()
+            .is_some_and(|m| m.doc_id != doc_id || m.revision != revision)
+        {
+            self.colour_map = None;
+        }
     }
 
     /// Rule symbols (symbol -> parameter name) `plugin` applies to a new
@@ -133,9 +170,30 @@ impl PluginUi {
         body: Option<BodyId>,
         summary: &rcad_commands::DocSummary,
     ) -> BTreeMap<String, String> {
+        let component = body.and_then(|b| {
+            summary
+                .assembly
+                .components
+                .iter()
+                .find(|c| c.bodies.contains(&b))
+                .map(|c| c.id.0)
+        });
+        self.rule_symbols_at(plugin, body, component, summary)
+    }
+
+    /// [`PluginUi::rule_symbols`] for an explicit rule context (a body
+    /// and/or a component; a new body has only its component).
+    pub(crate) fn rule_symbols_at(
+        &mut self,
+        plugin: &str,
+        body: Option<BodyId>,
+        component: Option<u32>,
+        summary: &rcad_commands::DocSummary,
+    ) -> BTreeMap<String, String> {
         if let Some(c) = &self.rule_cache
             && c.plugin == plugin
             && c.body == body
+            && c.component == component
             && c.revision == summary.revision
             && c.doc_id == summary.doc_id
         {
@@ -152,14 +210,7 @@ impl PluginUi {
                     &data,
                     &rcad_plugin::RuleContext {
                         body: body.map(|b| b.0),
-                        component: body.and_then(|b| {
-                            summary
-                                .assembly
-                                .components
-                                .iter()
-                                .find(|c| c.bodies.contains(&b))
-                                .map(|c| c.id.0)
-                        }),
+                        component,
                     },
                 )
                 .into_iter()
@@ -170,6 +221,7 @@ impl PluginUi {
         self.rule_cache = Some(RuleCache {
             plugin: plugin.into(),
             body,
+            component,
             revision: summary.revision,
             doc_id: summary.doc_id,
             symbols: symbols.clone(),
@@ -269,15 +321,20 @@ impl RcadApp {
         self.plugins.show_list = true;
     }
 
-    /// The plugin feature menu: every feature of every installed plugin.
+    /// The plugin menu: every feature and every analysis of every installed
+    /// plugin.
     pub(crate) fn plugin_features_menu(&mut self, ui: &mut egui::Ui) {
         crate::shell::ribbon::menu_min_width(ui);
         let list = self.plugins.list.clone();
-        if list.iter().all(|p| p.manifest.features.is_empty()) {
-            ui.weak("No plugin features installed");
+        if list
+            .iter()
+            .all(|p| p.manifest.features.is_empty() && p.manifest.analyses.is_empty())
+        {
+            ui.weak("No plugin features or analyses installed");
         }
+        let solid = !self.solid_bodies().is_empty();
         for p in &list {
-            if p.manifest.features.is_empty() {
+            if p.manifest.features.is_empty() && p.manifest.analyses.is_empty() {
                 continue;
             }
             ui.label(RichText::new(&p.manifest.name).small().strong());
@@ -290,6 +347,21 @@ impl RcadApp {
                     .on_disabled_hover_text("Open or create a document first");
                 if r.clicked() {
                     self.open_plugin_feature(&p.manifest.id, &f.id);
+                    ui.close();
+                }
+            }
+            if !p.manifest.analyses.is_empty() && !p.manifest.features.is_empty() {
+                ui.separator();
+            }
+            for a in &p.manifest.analyses {
+                let label = format!("{}: {}…", p.manifest.name, a.name);
+                let r = ui
+                    .add_enabled(solid, egui::Button::new(&label))
+                    .named(&label)
+                    .on_hover_text(&a.description)
+                    .on_disabled_hover_text("Create a solid body first");
+                if r.clicked() {
+                    self.open_plugin_analysis(&p.manifest.id, &a.id);
                     ui.close();
                 }
             }

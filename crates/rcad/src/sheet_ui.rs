@@ -46,6 +46,11 @@ pub struct SheetSurfaceForm {
     pub tolerance: String,
     pub thickness: String,
     pub reverse: bool,
+    /// Thicken: bind the new solid's thickness to its plugin rule (offered
+    /// when one applies), and the thickness text it was last seen with
+    /// (typing a value turns it off).
+    pub thicken_rule: bool,
+    pub thicken_seen: String,
     /// Surface extrusion distance and direction (sketch inspector).
     pub surface_distance: String,
     pub surface_reverse: bool,
@@ -69,6 +74,8 @@ impl Default for SheetSurfaceForm {
             tolerance: "0.001".into(),
             thickness: "2".into(),
             reverse: false,
+            thicken_rule: true,
+            thicken_seen: "2".into(),
             surface_distance: "10".into(),
             surface_reverse: false,
             analysis: None,
@@ -481,6 +488,26 @@ impl RcadApp {
         }
         let (doc, rev) = (self.summary.doc_id, self.summary.revision);
         let mut send: Vec<Command> = Vec::new();
+        // A plugin rule for the thickened solid (made in the surface's
+        // component, if any).
+        let thicken_rule = {
+            let t = crate::plugin_ui::core_rules::CoreTarget {
+                kind: "thicken",
+                slots: vec!["distance"],
+                body: None,
+                component: self
+                    .summary
+                    .assembly
+                    .components
+                    .iter()
+                    .find(|c| c.bodies.contains(&body))
+                    .map(|c| c.id.0),
+                fields: vec![],
+            };
+            let b = self.core_bindings(&t);
+            (!b.is_empty()).then(|| crate::plugin_ui::core_rules::label(&b))
+        };
+        let mut thicken_bind = false;
         let form = &mut self.sheet_surface;
         ui.horizontal(|ui| {
             num_field(ui, "Gap search (mm)", &mut form.search);
@@ -565,6 +592,15 @@ impl RcadApp {
                 num_field(ui, "Thickness (mm)", &mut form.thickness);
                 ui.checkbox(&mut form.reverse, "Against normal")
                     .probe("Against normal");
+                if form.thickness != form.thicken_seen {
+                    // A typed value stays a value.
+                    form.thicken_rule = false;
+                    form.thicken_seen = form.thickness.clone();
+                }
+                if let Some(text) = &thicken_rule {
+                    ui.checkbox(&mut form.thicken_rule, text)
+                        .probe("Use plastic rule");
+                }
                 if ui
                     .add_enabled(
                         parse(&form.thickness).is_some(),
@@ -574,6 +610,7 @@ impl RcadApp {
                     .on_hover_text("One planar or cylindrical face to an exact solid (new body)")
                     .clicked()
                 {
+                    thicken_bind = thicken_rule.is_some() && form.thicken_rule;
                     send.push(Command::ThickenSurface(ThickenArgs {
                         body,
                         distance: parse(&form.thickness).unwrap_or(1.0),
@@ -585,7 +622,11 @@ impl RcadApp {
             });
         }
         for c in send {
-            self.request(c);
+            let thicken = matches!(c, Command::ThickenSurface(_));
+            let token = self.request_token(c);
+            if thicken && thicken_bind {
+                self.plugins.bind_after = token;
+            }
         }
     }
 }

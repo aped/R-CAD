@@ -173,18 +173,41 @@ UI tests: `crates/rcad/tests/it/first_run_ui.rs`, `edit_feature_ui.rs`, `glyphs.
   their expression) and commits one `RedefineFeature`.
 * **PLASTIC tab** (Fusion's Plastic tab): SETUP (Manage Plastic Rules…, Assign Plastic Rule…),
   CREATE (Boss, Rib, Web, Snap Fit, Lip, Rest: the generic dialog for the `plastics` plugin's
-  features), INSPECT (Design Advice…). Manage Plastic Rules lists the rules, adds one from a preset
+  features), INSPECT (Design Advice…, Draft Analysis…, Accessibility Analysis…, Minimum Radius
+  Analysis…: one button per analysis of the `plastics` plugin, a test checks none is missing).
+  Manage Plastic Rules lists the rules, adds one from a preset
   (typical values, not supplier data) or blank, edits each value as an expression over the rule's
   symbols and its material, and deletes; Apply stores the whole data with one `SetPluginData` (one
   undo step; the rule's parameters `<Rule>_T`, … and materials with it). Assign Plastic Rule puts a
-  body under a rule or none. Code `plugin_ui/plastic_rules.rs`.
-* **Analysis window** (`plugin_ui/analysis.rs`; Design Advice): body, an optional pull face (Use
-  selected face) or the pull axis, limits (unchanged ones follow the body's rule), Run
-  (`RunPluginAnalysis`). The report's summary (thickness, areas too thin / thick, variation, draft,
-  undercut, knife edges) is labelled approximate with the report's own note; clicking an alert
-  selects its face.
-* **Any plugin:** UTILITIES ▸ PLUGINS ▸ Features lists every feature of every installed plugin
-  (external plugins appear without code changes); **Plugins…** lists id, name, version, built-in or
+  body or an assembly component (Assign to: the solid bodies, then the components) under a rule or
+  none; a component's bodies follow its rule unless they have their own. Code
+  `plugin_ui/plastic_rules.rs`.
+* **Analysis window** (`plugin_ui/analysis.rs`; every analysis of every plugin): body, an optional
+  pull / direction face (Use selected face) or the axis choice, limits (unchanged ones follow the
+  body's rule), Run (`RunPluginAnalysis`). The report is labelled approximate with its own note;
+  Draft, Accessibility and Minimum Radius get a tailored Results table (pull or direction, areas by
+  class, face counts; the radius limit, smallest radius, faces and area below it), then every key of
+  the report's `summary` is listed generically (nested objects one row per entry; the only view for
+  other analyses, e.g. Design Advice's thickness, draft, undercut and knife-edge values). Clicking an
+  alert selects its face.
+* **Colour map** (`plugin_ui/colour_map.rs`): a report with per-triangle arrays offers **Show on
+  model** / **Hide**. Draft: positive green, negative red, insufficient yellow; Accessibility:
+  accessible green, blocked red, facing away or edge-on grey; Minimum Radius: triangles below the
+  limit red. The engine re-tessellates the analysed body with the host's call and chord
+  (`rcad_kernel::tessellate(body, chord)`, deterministic per body and chord) and places it like the
+  display (one copy per visible occurrence); if the triangle count differs from the report's arrays
+  the window says "Colour map unavailable" instead of colouring the wrong triangles. Painted over
+  the 3D view (front faces only, far to near, slightly translucent) with a legend at the bottom left;
+  a derived display only, never stored, dropped by a new report or any model change.
+* **Rule binding in core dialogs** (`plugin_ui/core_rules.rs`): when the body a new Shell (either
+  dialog), Fillet edge, Fillet edge loop, Extrude (thin, or with a taper) or Thicken (surface
+  inspector; the new solid's component) works on is under a plugin rule, the dialog shows **Use
+  plastic rule (ABS_T)** (the expressions the rule gives the feature's rule-driven slots), on by
+  default. OK creates the feature as typed and, once that succeeds, sends `BindRuleParameters` for
+  it (a second undo step). Typing into a rule-driven field turns the choice off, so typed values
+  stay values unless it is turned back on. Edit Feature never shows it.
+* **Any plugin:** UTILITIES ▸ PLUGINS ▸ Features lists every feature and every analysis of every
+  installed plugin (external plugins appear without code changes); **Plugins…** lists id, name, version, built-in or
   external, features, analyses and load errors. External plugins load once at start of an
   interactive run (`RCAD_PLUGIN_PATH`, then `$XDG_DATA_HOME/r-cad/plugins`); tests and scripted
   scenes never load them. History and the timeline show a plugin feature's type name ("Boss").

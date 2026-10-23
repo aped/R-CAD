@@ -503,6 +503,7 @@ impl RcadApp {
             }
         } else {
             self.model_input(ui, &resp);
+            self.paint_colour_map(&painter, rect);
             self.paint_document_sketches(&painter, rect);
             self.doc_dim_input(ui);
             self.paint_placement(&painter, rect);

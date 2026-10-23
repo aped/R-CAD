@@ -488,6 +488,36 @@ pub fn paint(icon: Icon, p: &Painter, rect: Rect, c: Color32) {
             line((0.68, 0.22), (0.68, 0.34));
             line((0.68, 0.4), (0.68, 0.42));
         }
+        Icon::Draft => {
+            // A tapered wall and the pull arrow.
+            poly(&[(0.2, 0.88), (0.3, 0.35), (0.55, 0.35), (0.65, 0.88)], ADD);
+            line((0.3, 0.35), (0.2, 0.88));
+            p.rect_filled(rect_at(0.12, 0.88, 0.75, 0.94), 0.0, CUT);
+            line((0.82, 0.8), (0.82, 0.12));
+            line((0.82, 0.12), (0.74, 0.24));
+            line((0.82, 0.12), (0.9, 0.24));
+        }
+        Icon::Access => {
+            // A block with an undercut and the tool direction.
+            block(BODY);
+            p.rect_filled(rect_at(0.15, 0.6, 0.35, 0.72), 0.0, CUT);
+            line((0.5, 0.05), (0.5, 0.38));
+            line((0.5, 0.38), (0.42, 0.28));
+            line((0.5, 0.38), (0.58, 0.28));
+        }
+        Icon::Radius => {
+            // A quarter round with its radius.
+            line((0.15, 0.85), (0.15, 0.45));
+            line((0.15, 0.85), (0.55, 0.85));
+            let arc: Vec<Pos2> = (0..=8)
+                .map(|i| {
+                    let t = i as f32 / 8.0 * std::f32::consts::FRAC_PI_2;
+                    at(0.15 + 0.7 * t.sin(), 0.85 - 0.7 * t.cos())
+                })
+                .collect();
+            p.add(eframe::egui::Shape::line(arc, Stroke::new(w * 1.4, CUT)));
+            line((0.15, 0.85), (0.64, 0.36));
+        }
         Icon::Plugin => {
             // A puzzle-like piece: square with a tab and a notch.
             p.rect_stroke(

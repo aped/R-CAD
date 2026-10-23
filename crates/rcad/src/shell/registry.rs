@@ -146,6 +146,9 @@ pub enum CmdId {
     PlasticLip,
     PlasticRest,
     DesignAdvice,
+    DraftAnalysis,
+    AccessibilityAnalysis,
+    MinimumRadiusAnalysis,
     // UTILITIES ▸ PLUGINS
     Plugins,
 }
@@ -321,6 +324,9 @@ pub enum Icon {
     Lip,
     Rest,
     Advice,
+    Draft,
+    Access,
+    Radius,
     Plugin,
 }
 
@@ -907,6 +913,21 @@ pub static COMMANDS: &[CommandDef] = &[
         fusion: [], classic: [],
         places: [P_INSPECT], mm: None,
         enabled: |a| a.need_solid(), run: |a| a.open_plugin_analysis("plastics", "design_advice")),
+    def!(DraftAnalysis, "Draft Analysis…", Draft,
+        "Signed draft of every face for a pull direction, coloured on the model",
+        fusion: [], classic: [],
+        places: [P_INSPECT], mm: None,
+        enabled: |a| a.need_solid(), run: |a| a.open_plugin_analysis("plastics", "draft_analysis")),
+    def!(AccessibilityAnalysis, "Accessibility Analysis…", Access,
+        "Faces a straight tool or mould half reaches along a direction, coloured on the model",
+        fusion: [], classic: [],
+        places: [P_INSPECT], mm: None,
+        enabled: |a| a.need_solid(), run: |a| a.open_plugin_analysis("plastics", "accessibility")),
+    def!(MinimumRadiusAnalysis, "Minimum Radius Analysis…", Radius,
+        "Smallest curvature radius of every face, flagged below a minimum",
+        fusion: [], classic: [],
+        places: [P_INSPECT], mm: None,
+        enabled: |a| a.need_solid(), run: |a| a.open_plugin_analysis("plastics", "minimum_radius")),
     // ----- UTILITIES ▸ PLUGINS -----
     def!(Plugins, "Plugins…", Plugin, "Installed plugins: versions, features and analyses",
         fusion: [], classic: [],
@@ -1112,6 +1133,9 @@ mod tests {
         CmdId::PlasticLip,
         CmdId::PlasticRest,
         CmdId::DesignAdvice,
+        CmdId::DraftAnalysis,
+        CmdId::AccessibilityAnalysis,
+        CmdId::MinimumRadiusAnalysis,
         CmdId::Plugins,
     ];
 
