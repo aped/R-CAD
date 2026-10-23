@@ -109,3 +109,77 @@ fn a_rest_too_thick_for_its_profile_is_refused() {
     assert!(m.contains("more than the thickness"), "{m}");
     assert_close(vol(&s, BodyId(1)), BOX, 1e-9, "unchanged");
 }
+
+#[test]
+fn a_rounded_rest_follows_its_arcs() {
+    use std::f64::consts::PI;
+    let (mut s, e) = open_box();
+    // A 16 x 10 stadium (straight 6, end radius 5) 10 above the floor.
+    let mut sk = rcad_sketch::Sketch::default();
+    let pts = [
+        [-3.0, -5.0],
+        [3.0, -5.0],
+        [3.0, 5.0],
+        [-3.0, 5.0],
+        [3.0, 0.0],
+        [-3.0, 0.0],
+    ];
+    let id: Vec<_> = pts.iter().map(|p| sk.add_point(p[0], p[1])).collect();
+    for (i, p) in id.iter().zip(&pts) {
+        sk.constraints.push(rcad_sketch::Constraint::FixedPoint {
+            p: *i,
+            x: p[0],
+            y: p[1],
+        });
+    }
+    sk.add_line(id[0], id[1]);
+    sk.add_line(id[2], id[3]);
+    sk.entities.push(rcad_sketch::Entity::Arc {
+        id: rcad_sketch::EntityId(3),
+        center: id[4],
+        start: id[1],
+        end: id[2],
+    });
+    sk.entities.push(rcad_sketch::Entity::Arc {
+        id: rcad_sketch::EntityId(4),
+        center: id[5],
+        start: id[3],
+        end: id[0],
+    });
+    let plane = SketchPlane::Offset {
+        base: rcad_document::PlaneBase::Face(FaceRef {
+            feature: e,
+            role: FaceRole::ExtrudeEndCap,
+        }),
+        distance: -8.0,
+        angle: 0.0,
+    };
+    let f = ok(
+        &mut s,
+        Command::CreateSketch {
+            name: None,
+            plane,
+            template: SketchTemplate::Custom { sketch: sk },
+        },
+    )
+    .feature
+    .unwrap();
+    ok(
+        &mut s,
+        feature(
+            "rest",
+            &[("sketch", sketch_in(f))],
+            &[("thickness", 2.0), ("draft_deg", 0.0)],
+            &[],
+        ),
+    );
+    // Solid 10 high minus its inside (offset 2 in: straight 6, r 3) over
+    // the floor (2) and the walls (8).
+    let (outer, inner) = (10.0 * 6.0 + 25.0 * PI, 6.0 * 6.0 + 9.0 * PI);
+    assert_close(
+        vol(&s, BodyId(1)),
+        BOX + outer * 10.0 - inner * 10.0,
+        1e-6,
+        "rounded rest",
+    );
+}

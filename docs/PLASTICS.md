@@ -201,15 +201,17 @@ one inner boundary loop.
 **Refused:** a band not narrower than the wall; a face that is not a rim; a groove deeper than
 the part.
 
-**Not modelled:** Fusion's edge-chain selection, face guide and extents; trapezoidal sections.
+**Not modelled:** Fusion's edge-chain selection, face guide and extents. Trapezoidal (drafted)
+sections are not available yet: the exact constructions tried (a tapered tool across the cavity,
+per-edge trapezoids, per-edge draft wedges) fail in the boolean kernel at the rim corners.
 The rim face stands for the edge chain.
 
 ## Rest
 
 A flat platform inside a shelled part, with uniform walls, so it makes no thick section.
 
-**Inputs:** `sketch`: closed profiles (circles, line loops) on a plane offset from a face of the
-body, above a floor.
+**Inputs:** `sketch`: closed profiles (circles, loops of lines and arcs) on a plane offset from a
+face of the body, above a floor. Drafted rests take circles and line loops.
 
 **Parameters:** `thickness` (*rule* `T`), `offset` (0, the top relative to the sketch plane),
 `depth` (10), `draft_deg` (*rule* `DA`).

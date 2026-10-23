@@ -1,7 +1,7 @@
 //! Rest (docs/PLASTICS.md "Rest"): a flat platform inside a shelled part
 //! with walls of uniform thickness, so it makes no thick section.
 //!
-//! For each closed profile of the sketch (circles, line loops) on a plane
+//! For each closed profile of the sketch (circles, loops of lines and arcs) on a plane
 //! above a floor of the body: the profile, drafted by `draft_deg` (exact at
 //! the top, growing towards the floor), is joined from the floor (the
 //! nearest face below the sketch plane facing it, `to_next`; or `depth`
@@ -11,7 +11,9 @@
 //! whose inside opens through the floor (uniform wall, no closed void).
 //! Operation ids `4·k + part` (0 solid, 1 inside) per profile `k`.
 //!
-//! Wall thickness is measured across the walls in the sketch plane.
+//! Wall thickness is measured across the walls in the sketch plane. Drafted
+//! rests take circles and line loops (a drafted loop with arcs is refused by
+//! the kernel's tapered tool).
 //! Not modelled: Fusion's top-face limits, trimming at the body and
 //! per-side drafts.
 use crate::util::{EPS, closed_profiles, invalid, prism};
@@ -77,8 +79,18 @@ fn profile_footprint(p: &rcad_plugin::Profile) -> Footprint {
         P::Circle { center, radius } => footprint_of(&[*center], *radius),
         P::Polygon { points } => footprint_of(points, 0.0),
         P::Loop { segments } => {
+            // Vertices grown by the largest arc radius (covers arc bulges).
             let pts: Vec<[f64; 2]> = segments.iter().map(|s| s.start()).collect();
-            footprint_of(&pts, 0.0)
+            let r = segments
+                .iter()
+                .filter_map(|s| match *s {
+                    rcad_plugin::Segment::Arc { start, center, .. } => {
+                        Some((start[0] - center[0]).hypot(start[1] - center[1]))
+                    }
+                    _ => None,
+                })
+                .fold(0.0, f64::max);
+            footprint_of(&pts, r)
         }
     }
 }

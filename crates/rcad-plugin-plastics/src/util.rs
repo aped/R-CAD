@@ -85,56 +85,72 @@ pub fn placement_points(s: &rcad_plugin::SketchGeom) -> Vec<[f64; 2]> {
     out
 }
 
-/// Closed profiles of a sketch: its circles, and its lines chained end to
-/// end into closed polygons (each line used once). Arcs and open chains are
-/// refused with the reason.
+/// Closed profiles of a sketch: its circles, and its lines and arcs chained
+/// end to end into closed loops (each curve used once; a loop of lines only
+/// is a polygon). Open chains are refused with the reason.
 pub fn closed_profiles(f: &str, s: &rcad_plugin::SketchGeom) -> Result<Vec<Profile>, PluginError> {
-    use rcad_plugin::Curve;
+    use rcad_plugin::{Curve, Segment};
+    // (start, end, Some((centre, ccw from start to end)) for arcs).
+    type Piece = ([f64; 2], [f64; 2], Option<[f64; 2]>);
     let mut out = Vec::new();
-    let mut lines: Vec<([f64; 2], [f64; 2])> = Vec::new();
+    let mut pieces: Vec<Piece> = Vec::new();
     for c in &s.curves {
         match *c {
             Curve::Circle { center, radius } => out.push(Profile::Circle { center, radius }),
-            Curve::Line { a, b } => lines.push((a, b)),
-            Curve::Arc { .. } => {
-                return Err(unsupported(
-                    f,
-                    "profiles with arcs are not supported (circles and line loops are)",
-                ));
+            Curve::Line { a, b } => pieces.push((a, b, None)),
+            Curve::Arc {
+                center,
+                radius,
+                start,
+                end,
+            } => {
+                let p = |t: f64| [center[0] + radius * t.cos(), center[1] + radius * t.sin()];
+                pieces.push((p(start), p(end), Some(center)));
             }
         }
     }
     let same = |p: [f64; 2], q: [f64; 2]| (p[0] - q[0]).hypot(p[1] - q[1]) < EPS;
-    let mut used = vec![false; lines.len()];
-    for start in 0..lines.len() {
-        if used[start] {
+    let mut used = vec![false; pieces.len()];
+    for first in 0..pieces.len() {
+        if used[first] {
             continue;
         }
-        used[start] = true;
-        let first = lines[start].0;
-        let mut pts = vec![first];
-        let mut at = lines[start].1;
-        loop {
-            if same(at, first) {
-                break;
+        used[first] = true;
+        let mut segs = Vec::new();
+        let seg = |pc: &Piece, forward: bool| {
+            let from = if forward { pc.0 } else { pc.1 };
+            match pc.2 {
+                None => Segment::Line { start: from },
+                Some(center) => Segment::Arc {
+                    start: from,
+                    center,
+                    ccw: forward,
+                },
             }
-            pts.push(at);
-            let next = (0..lines.len())
-                .find(|&j| !used[j] && (same(lines[j].0, at) || same(lines[j].1, at)));
-            let Some(j) = next else {
-                return Err(invalid(f, "the sketch lines do not form closed loops"));
+        };
+        segs.push(seg(&pieces[first], true));
+        let start = pieces[first].0;
+        let mut at = pieces[first].1;
+        while !same(at, start) {
+            let Some(j) = (0..pieces.len())
+                .find(|&j| !used[j] && (same(pieces[j].0, at) || same(pieces[j].1, at)))
+            else {
+                return Err(invalid(f, "the sketch curves do not form closed loops"));
             };
             used[j] = true;
-            at = if same(lines[j].0, at) {
-                lines[j].1
-            } else {
-                lines[j].0
-            };
+            let forward = same(pieces[j].0, at);
+            segs.push(seg(&pieces[j], forward));
+            at = if forward { pieces[j].1 } else { pieces[j].0 };
         }
-        if pts.len() < 3 {
-            return Err(invalid(f, "a closed loop needs at least three lines"));
+        if segs.len() < 2
+            || (segs.len() < 3 && segs.iter().all(|s| matches!(s, Segment::Line { .. })))
+        {
+            return Err(invalid(
+                f,
+                "a closed loop needs at least three lines (or lines and arcs)",
+            ));
         }
-        out.push(Profile::Polygon { points: pts });
+        out.push(Profile::Loop { segments: segs });
     }
     if out.is_empty() {
         return Err(invalid(f, "the sketch has no closed profile"));
