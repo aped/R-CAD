@@ -24,6 +24,9 @@
 //!
 //! Checked like every direct edit (edges on surfaces, one closed shell) plus
 //! point probes inside the fillet and in the air beyond it.
+//!
+//! A straight wall that is not a whole base loop (an open run ending in end
+//! faces) or has material outside it goes to [`super::root_round_open`].
 use super::*;
 
 /// Round the base edge of the round boss of radius `boss_diameter / 2`
@@ -95,6 +98,11 @@ pub fn root_round(
         }
     }
     if cyl.is_empty() {
+        // A wall with material outside it (the inner side of a web along
+        // an arc) or an open run: the open construction.
+        if half_angle == 0.0 {
+            return super::root_round_open::root_round_open(body, c0, a, r, f);
+        }
         return Err(invalid(format!(
             "root fillet: no Ø{boss_diameter} mm boss wall on this axis"
         )));
@@ -125,6 +133,9 @@ pub fn root_round(
         }
     }
     let Some((bf, wire_idx, n)) = base else {
+        if half_angle == 0.0 {
+            return super::root_round_open::root_round_open(body, c0, a, r, f);
+        }
         return Err(invalid(
             "root fillet: the boss does not stand on a planar face perpendicular to its axis at \
              the given point",

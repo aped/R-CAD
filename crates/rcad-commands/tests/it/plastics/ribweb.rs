@@ -403,3 +403,120 @@ fn root_fillets_round_where_webs_and_ribs_meet_the_floor() {
     );
     assert!(m.contains("need extent to_next"), "{m}");
 }
+
+#[test]
+fn root_fillets_follow_a_web_along_an_arc() {
+    use std::f64::consts::PI;
+    // Half-circle web (r 10, 2 thick: walls r 9 and 11) on the rim plane, to
+    // the floor (z 2), with R1 root fillets on both walls: torus bands
+    // ending in the web's radial end faces. Pappus: the spandrel
+    // A = f²(1 − π/4), centroid d = f(10 − 3π)/(12 − 3π) from each wall,
+    // swept through π about the centre at radius 11 + d and 9 − d.
+    let filleted = |f: f64| {
+        let (a, d) = (
+            f * f * (1.0 - PI / 4.0),
+            f * (10.0 - 3.0 * PI) / (12.0 - 3.0 * PI),
+        );
+        PI * a * (11.0 + d) + PI * a * (9.0 - d)
+    };
+    let web = PI / 2.0 * (11.0f64.powi(2) - 9.0f64.powi(2)) * 18.0;
+    let (mut s, e) = open_box();
+    let sk = arc_sketch(&mut s, end_cap(e), [0.0, 0.0], 10.0, 0.0, PI);
+    let r = ok(
+        &mut s,
+        feature(
+            "web",
+            &[("sketch", sketch_in(sk))],
+            &[
+                ("thickness", 2.0),
+                ("draft_deg", 0.0),
+                ("fillet_radius", 1.0),
+            ],
+            &[("direction", "flip"), ("extent", "to_next")],
+        ),
+    );
+    assert_close(
+        vol(&s, BodyId(1)),
+        BOX + web + filleted(1.0),
+        1e-6,
+        "arc web fillets",
+    );
+    // At the arc's middle (y = ±10 depending on the cap's frame): in each
+    // fillet corner material, near each fillet's centre air.
+    let side = if probe(&s, BodyId(1), &[[0.0, 10.0, 10.0]])[0] == Some(true) {
+        1.0
+    } else {
+        -1.0
+    };
+    let at = |y: f64, z: f64| [0.0, side * y, z];
+    let pr = probe(
+        &s,
+        BodyId(1),
+        &[at(11.1, 2.05), at(11.8, 2.8), at(8.9, 2.05), at(8.2, 2.8)],
+    );
+    assert_eq!(pr, [Some(true), Some(false), Some(true), Some(false)]);
+    // Regenerates after an upstream edit of the radius.
+    let f = r.feature.unwrap();
+    ok(
+        &mut s,
+        Command::SetParameter {
+            feature: f,
+            name: "fillet_radius".into(),
+            value: 1.5,
+        },
+    );
+    assert_close(
+        vol(&s, BodyId(1)),
+        BOX + web + filleted(1.5),
+        1e-6,
+        "edited radius",
+    );
+    // A band reaching the box's side walls (11 + 8 > 18) is refused with
+    // the reason, keeping the previous state.
+    let m = err(
+        &mut s,
+        Command::SetParameter {
+            feature: f,
+            name: "fillet_radius".into(),
+            value: 8.0,
+        },
+    );
+    assert!(m.contains("does not fit"), "{m}");
+    assert!(m.contains("band"), "{m}");
+    assert_close(
+        vol(&s, BodyId(1)),
+        BOX + web + filleted(1.5),
+        1e-6,
+        "rolled back",
+    );
+    // Three quarters of a circle (the wall spans several faces, joined by
+    // seams that are shortened like the ends' edges): 1.5 × the half.
+    let (mut s, e) = open_box();
+    let sk = arc_sketch(
+        &mut s,
+        end_cap(e),
+        [0.0, 0.0],
+        10.0,
+        -PI / 4.0,
+        5.0 * PI / 4.0,
+    );
+    ok(
+        &mut s,
+        feature(
+            "web",
+            &[("sketch", sketch_in(sk))],
+            &[
+                ("thickness", 2.0),
+                ("draft_deg", 0.0),
+                ("fillet_radius", 1.0),
+            ],
+            &[("direction", "flip"), ("extent", "to_next")],
+        ),
+    );
+    assert_close(
+        vol(&s, BodyId(1)),
+        BOX + 1.5 * (web + filleted(1.0)),
+        1e-6,
+        "three-quarter arc web fillets",
+    );
+}

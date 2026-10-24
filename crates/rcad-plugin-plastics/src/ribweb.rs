@@ -495,7 +495,8 @@ pub fn build_rib(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
         if fr > 0.0 {
             return Err(unsupported(
                 f,
-                "root fillets along arcs are not supported (straight lines only)",
+                "a rib along an arc has no root to fillet (to_next needs one distance to a \
+                 planar face along the curve)",
             ));
         }
         if a != 0.0 {
@@ -669,10 +670,10 @@ pub fn build_web(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
     }
     for (id, arc) in arcs {
         let label = format!("web arc {}", id + 1);
-        if fr > 0.0 {
-            return Err(unsupported(
+        if fr > 0.0 && !to_next {
+            return Err(invalid(
                 f,
-                "root fillets along arcs are not supported (straight lines only)",
+                "root fillets need extent to_next (the face the web stands on)",
             ));
         }
         if a != 0.0 {
@@ -710,8 +711,31 @@ pub fn build_web(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
             span,
             0.0,
             Mode::Join,
-            label,
+            label.clone(),
         ));
+        if fr > 0.0 {
+            // Both walls are round about the arc's centre: the kernel's
+            // root fillet of an open run of a round wall (a torus band
+            // ending in the web's radial end faces).
+            let n = if up {
+                s.frame.z
+            } else {
+                scale(s.frame.z, -1.0)
+            };
+            let at = add(s.frame.point(arc.c, 0.0), scale(n, depth - SINK));
+            for (k, wall) in [r1, r0].into_iter().enumerate() {
+                ops.push(Op::RootRound {
+                    id: 1000 + 2 * id + k as u32,
+                    body: body.into(),
+                    at,
+                    axis: n,
+                    boss_diameter: 2.0 * wall,
+                    radius: fr,
+                    draft_deg: 0.0,
+                    label: format!("{label} root fillet {}", k + 1),
+                });
+            }
+        }
     }
     Ok(ops)
 }

@@ -4,7 +4,7 @@
 # Builds cases with the release rcad-cli (RCAD_CLI overrides the binary), exports each body to
 # STEP and checks with FreeCAD: exactly one valid solid, and its volume
 #   - against a closed form computed here (bosses with gussets, a drafted rest, a lip and its
-#     groove, a snap-fit groove), to 5e-5 relative: OpenCascade's integration of our exports
+#     groove, a snap-fit groove, root fillets along an arc), to 5e-5 relative: OpenCascade's integration of our exports
 #     differs by up to ~1e-5 relative (no pcurves on planar faces, see tools/check_revolved.sh);
 #     the command tests assert the exact volumes to 1e-6;
 #   - for the full plastic enclosure example (no closed form), against R-CAD's own volume to
@@ -125,6 +125,13 @@ cases["draft_two_sided"] = ([{"cmd": "new_document"}, rect("WorldXY", 40.0, 30.0
                  "fixed": fc({"Offset": {"base": {"Face": face(2, "ExtrudeStartCap")}, "distance": -10.0}})},
        {"draft_deg": 3.0}, {"sides": "two_sides"})],
     {1: 2 * 10 / 6 * (area3(0) + 4 * area3(5) + area3(10))})
+# L. The half-circle web with root fillets (r 1) on both walls: Pappus about the arc's centre,
+# centroids at 11 + d and 9 - d, swept through pi.
+d1 = f * (10 - 3 * math.pi) / (12 - 3 * math.pi)
+cases["arc_web_root"] = (open_box + [arc_sketch,
+    pf("web", {"sketch": sk(4)}, {"thickness": 2.0, "draft_deg": 0.0, "fillet_radius": f},
+       {"direction": "flip", "extent": "to_next"})],
+    {1: BOX + math.pi / 2 * (11 ** 2 - 9 ** 2) * 18 + math.pi * f * f * (1 - math.pi / 4) * ((11 + d1) + (9 - d1))})
 # E. The plastic enclosure example (no closed form: cross-check against R-CAD's volumes).
 ex = json.load(open(f"{repo}/examples/plastic_enclosure_workflow.json"))
 ex = [c for c in ex if c["cmd"] != "save"]

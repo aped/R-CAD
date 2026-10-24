@@ -135,11 +135,10 @@ shank is drafted.
 
 **Root fillet.** An exact torus band built into the topology by the kernel. The base loop is
 widened, the shank wall shortened, and a toroidal face is inserted (no boolean, so no tangent
-contacts). It applies to straight shanks with nothing else on the base loop: no gussets, and the
-mating shank too.
+contacts). It applies to straight and drafted shanks (a cylinder or a cone) with nothing else on the base
+loop: no gussets, and the mating shank too.
 
-**Not modelled:** root fillets on drafted shanks (the kernel's root fillet takes a cylinder),
-drafted ribs, fastener components.
+**Not modelled:** drafted ribs, fastener components.
 
 ## Rib and Web
 
@@ -178,7 +177,15 @@ section); a draft that closes the wall before its depth.
 get exact edge fillets (the kernel's concave edge fillet). This needs `to_next`, so that face is
 known. Lines that cross split those edges, and the kernel then refuses with the reason.
 
-**Not modelled:** root fillets along arcs, Extend Curves.
+A web along an arc gets an exact torus band on each round wall: the kernel's root fillet of an
+open run of a round wall, built into the topology like the boss's. The band runs outwards on the
+convex wall and inwards on the concave one (which needs a wall radius larger than the fillet), and
+ends in the web's radial end faces, which gain the fillet's quarter circle. Refused with the
+reason: an arc web whose ends meet another wall (the band would have to be trimmed by it), a band
+reaching another edge of the face, and a fillet reaching the top of the wall. A rib along an arc
+has no root to fillet: `to_next` needs one distance to a planar face along the curve.
+
+**Not modelled:** Extend Curves.
 
 ## Snap Fit
 
@@ -400,10 +407,10 @@ closed forms to 1e-6 relative, with point probes:
 - a two-sided draft;
 - a snap-fit groove;
 - a drafted box;
-- a web along an arc;
+- a web along an arc, also with root fillets;
 - the enclosure example.
 
-FreeCAD (OpenCascade) reads each of the 15 bodies as one valid solid. Volumes agree with the
+FreeCAD (OpenCascade) reads each of the 16 bodies as one valid solid. Volumes agree with the
 closed forms within 2e-9 relative, and with R-CAD's own for the enclosure.
 
 **More command tests** (same directory): boss tip fillets against the cap-loop oracle, rib to

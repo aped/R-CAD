@@ -259,6 +259,9 @@ pub enum Op {
     /// Exact concave root fillet of radius `radius` where the round boss
     /// (cylinder or drafted cone) of `boss_diameter` at its base on the axis through `at` along `axis` meets the
     /// planar face through `at` it stands on, on the body of input `body`.
+    /// With no draft, the wall may also be an open run of a cylinder ending
+    /// in radial end faces, with material on either side (the walls of a
+    /// web along an arc).
     /// Built into the topology by the kernel (a torus band; no boolean),
     /// checked by probes.
     RootRound {
