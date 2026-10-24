@@ -343,6 +343,10 @@
               "value": 0.1,
               "kind": "length"
             },
+            "draft_deg": {
+              "value": 0.0,
+              "kind": "angle"
+            },
             "height": {
               "value": 2.0,
               "kind": "length"
@@ -473,6 +477,10 @@
               "value": 6.0,
               "kind": "length"
             },
+            "csink_angle_deg": {
+              "value": 90.0,
+              "kind": "angle"
+            },
             "diameter": {
               "value": 6.0,
               "kind": "length"
@@ -540,10 +548,28 @@
             "rib_total_deg": {
               "value": 360.0,
               "kind": "angle"
+            },
+            "root_radius": {
+              "value": 0.0,
+              "kind": "length"
+            },
+            "step_depth": {
+              "value": 1.0,
+              "kind": "length"
+            },
+            "step_diameter": {
+              "value": 4.5,
+              "kind": "length"
+            },
+            "tip_radius": {
+              "value": 0.0,
+              "kind": "length"
             }
           },
           "choices": {
-            "hole": "pilot"
+            "hole": "pilot",
+            "seat": "counterbore",
+            "step": "none"
           }
         },
         "expressions": {
@@ -630,6 +656,10 @@
             "draft_deg": {
               "value": 1.0,
               "kind": "angle"
+            },
+            "fillet_radius": {
+              "value": 0.0,
+              "kind": "length"
             },
             "thickness": {
               "value": 2.0,
@@ -893,6 +923,10 @@
               "value": 5.0,
               "kind": "length"
             },
+            "base_fillet": {
+              "value": 0.0,
+              "kind": "length"
+            },
             "catch_depth": {
               "value": 0.6666666666666666,
               "kind": "length"
@@ -944,6 +978,7 @@
           },
           "choices": {
             "extent": "to_next",
+            "orient": "uniform",
             "orientation": "perpendicular",
             "type": "hook_and_groove"
           }
