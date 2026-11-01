@@ -1,7 +1,7 @@
 """Unit tests for the add-in command model (events, command definitions,
 commands, command inputs) and the headless add-in driver ``adsk._addin``.
 
-    python3 -m unittest discover -s compat/fusion/tests
+    python3 -m unittest discover -s compat/scripting/tests
 
 (also run by `cargo test -p rcad-cli`).
 """
@@ -414,7 +414,7 @@ class Driver(unittest.TestCase):
         pts = r["steps"][1]["command"]["sketch"]["points"]
         self.assertEqual(max(p["x"] for p in pts), 20.0)
         self.assertEqual(r["addin"]["command"], "Cmd")
-        # Without fork (Windows) previews are skipped (docs/FUSION_SCRIPTS.md).
+        # Without fork (Windows) previews are skipped (docs/SCRIPTING.md).
         self.assertEqual(r["addin"]["preview"], "discarded" if hasattr(os, "fork") else "skipped")
         self.assertEqual(r["addin"]["inputs"][0]["expression"], "2 cm")
 

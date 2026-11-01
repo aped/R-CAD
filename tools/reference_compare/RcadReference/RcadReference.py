@@ -1,12 +1,12 @@
-"""Run in Autodesk Fusion (Utilities > Scripts and Add-Ins > + > this folder).
+"""Run in the reference application as a script (add this folder to its scripts list).
 
-Builds every reference case in a new design document and writes what Fusion
+Builds every reference case in a new design document and writes what it
 measures for each body (volume, centre of mass, bounding box, face count) to
-fusion_results.json next to this script. Compare with R-CAD's results using
-tools/fusion_reference/compare.py (docs/FUSION_SCRIPTS.md).
+reference_results.json next to this script. Compare with R-CAD's results using
+tools/reference_compare/compare.py (docs/SCRIPTING.md).
 
-The cases are the same Fusion API scripts R-CAD runs with
-`rcad-cli fusion-script`; this runner only adds the measurement.
+The cases are the same add-in API scripts R-CAD runs with
+`rcad-cli script`; this runner only adds the measurement.
 """
 
 import importlib.util
@@ -24,8 +24,8 @@ CASES = [
     "../cases/boss_tip.py",
     "../cases/boss_drafted_root.py",
     "../cases/web_fillet_box.py",
-    "../../../compat/fusion/examples/plate_with_hole.py",
-    "../../../compat/fusion/examples/plastic_box.py",
+    "../../../compat/scripting/examples/plate_with_hole.py",
+    "../../../compat/scripting/examples/plastic_box.py",
 ]
 
 
@@ -52,7 +52,7 @@ def _measure(design):
                 "name": body.name,
                 "is_solid": body.isSolid,
                 "faces": body.faces.count,
-                # Fusion's internal units: cm, cm^3.
+                # The API's internal units: cm, cm^3.
                 "volume_cm3": props.volume,
                 "area_cm2": props.area,
                 "centroid_cm": [com.x, com.y, com.z],
@@ -65,7 +65,7 @@ def _measure(design):
 
 def run(context):
     app = adsk.core.Application.get()
-    results = {"fusion_version": app.version, "cases": {}}
+    results = {"reference_version": app.version, "cases": {}}
     for rel in CASES:
         path = os.path.normpath(os.path.join(HERE, rel))
         name = os.path.splitext(os.path.basename(path))[0]
@@ -81,7 +81,7 @@ def run(context):
         except Exception:
             entry["error"] = traceback.format_exc()
         results["cases"][name] = entry
-    out = os.path.join(HERE, "fusion_results.json")
+    out = os.path.join(HERE, "reference_results.json")
     with open(out, "w") as f:
         json.dump(results, f, indent=1)
     app.userInterface.messageBox("Wrote " + out)

@@ -4,8 +4,8 @@ walls and an optional web along the middle.
 
 Run headless with:
 
-    rcad-cli fusion-addin compat/fusion/examples/addins/PlasticBoxAddin --list
-    rcad-cli fusion-addin compat/fusion/examples/addins/PlasticBoxAddin \
+    rcad-cli addin compat/scripting/examples/addins/PlasticBoxAddin --list
+    rcad-cli addin compat/scripting/examples/addins/PlasticBoxAddin \
         --input width="100 mm" --input bosses=3 --out box.rcad.json
 
 Values read from the inputs are in the API's internal units (cm, radians).

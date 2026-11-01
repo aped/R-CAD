@@ -1,6 +1,6 @@
 """A 100 x 60 mm plate, `thick` thick, with a 15 mm hole cut through it.
 
-Run with:  rcad-cli fusion-script compat/fusion/examples/plate_with_hole.py --out plate.rcad.json
+Run with:  rcad-cli script compat/scripting/examples/plate_with_hole.py --out plate.rcad.json
 
 Lengths given as reals are in centimetres (the API's internal unit); the
 plate thickness is a user parameter, and both extrusions are bound to it.
@@ -51,6 +51,6 @@ def run(context):
         cut.setDistanceExtent(False, adsk.core.ValueInput.createByString("-thick"))
         root.features.extrudeFeatures.add(cut)
         ui.messageBox("Plate with hole built", "plate_with_hole")
-    except:  # noqa: E722 - the usual Fusion script pattern
+    except:  # noqa: E722 - the usual add-in script pattern
         if ui:
             ui.messageBox("Failed:\n{}".format(traceback.format_exc()))

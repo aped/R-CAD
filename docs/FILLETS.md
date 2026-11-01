@@ -83,8 +83,8 @@ to 1e-9 relative.
 
 ### Hole edges
 With `holes: true` ("Include hole edges" in the dialog), the loop of every hole in the face
-is blended too, so every edge of the face is rounded or chamfered, as when a face is selected
-in Fusion. A hole's rim is traversed with the material on its left, which makes its arcs
+is blended too, so every edge of the face is rounded or chamfered, as when a whole face is
+selected for a fillet. A hole's rim is traversed with the material on its left, which makes its arcs
 concave: they get tori of major radius R + r, or for a chamfer a countersink-like cone. The
 removed volume around a round hole of radius R is 2π (A R + M). Hole walls must run straight
 down like the outer walls, and bands of different loops must stay at least 2r apart.

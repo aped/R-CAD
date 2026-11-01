@@ -7,8 +7,7 @@ plastic part design:
 - Boss, Rib, Web, Snap Fit, Lip, Rest and Draft;
 - Design Advice, Draft Analysis, Accessibility Analysis and Minimum Radius Analysis.
 
-The behavioural reference is the Plastic tab of Autodesk Fusion's Design workspace (Fusion
-documentation; no Fusion code or assets are used). Each feature is built from checked operations
+Each feature is built from checked operations
 (docs/PLUGINS.md: prisms, edge-loop blends, face replacement): results are exact B-rep and pass the same result gate as Extrude
 Join/Cut. What that cannot build exactly is refused or listed below as a deviation, never
 approximated.
@@ -66,9 +65,9 @@ given to the parameter's rule template. A web's thickness becomes `ABS_T`; a bos
 thickness becomes `0.6*ABS_T`. Editing the rule updates every bound feature, and undo restores
 it.
 
-As in Fusion, features created before the rule was assigned keep their plain values.
+Features created before the rule was assigned keep their plain values.
 
-**Components.** As in Fusion, a rule can be assigned to an assembly component
+**Components.** A rule can also be assigned to an assembly component
 (`"components": {"<id>": "ABS"}`). Its bodies take the rule's material and new features on them
 bind to it; a body's own assignment wins over its component's.
 
@@ -105,7 +104,7 @@ sketch and facing it.
 - a drafted shank from the base face (the nearest face at or below the sketch plane facing it)
   up `height`;
 - gusset ribs, a section from the axis to `rib_length` with a flat top at `rib_height`,
-  chamfered over the last `rib_chamfer` down to `rib_tip_height` (Fusion's chamfer profile),
+  chamfered over the last `rib_chamfer` down to `rib_tip_height` (a chamfer profile),
   spread evenly over the total angle. The chamfer must start outside the shank: the flat top
   then meets the shank in circle arcs and the gusset sides in straight lines, all exact edges, so
   the body exports to STEP. On a drafted shank, the kernel builds the shank and its gussets
@@ -130,7 +129,7 @@ With `mate`, the other body also gets:
 - a mate face that is not parallel and facing;
 - no room for the mating shank.
 
-**Alignment step** (Fusion's Step In/Out). `out` puts a ring of `step_diameter` × `step_depth`
+**Alignment step** (step in/out). `out` puts a ring of `step_diameter` × `step_depth`
 on each shank top and a recess `gap` wider and deeper in the mating boss; `in` is the reverse.
 
 **Tip fillet.** An exact cap-loop blend of the shank top, applied last (docs/FILLETS.md). The
@@ -217,7 +216,7 @@ Cantilever hooks at sketch points, with an optional mating groove or loop.
 
 **Rotation.** `uniform` turns every catch to `rotation_deg`. `outward` and `inward` point each
 catch away from or towards the centroid of the points, plus `rotation_deg`. This is a fixed-point
-form of Fusion's Aligned rotation.
+form of an aligned rotation.
 
 **Root.**
 - `perpendicular` hooks stand on the sketch's face.
@@ -231,8 +230,7 @@ form of Fusion's Aligned rotation.
 
 **Refused:** a catch too short for its angles; a catch longer than the beam.
 
-**Not modelled:** deflection/strain checks (Fusion has none either), Fusion's
-lettered advanced dimensions.
+**Not modelled:** deflection/strain checks, lettered advanced dimensions.
 
 ## Lip
 
@@ -259,7 +257,7 @@ the part.
 **Extents.** With two points, the lip (and its groove) runs only along the rim from the first
 point to the second, counter-clockwise seen from outside the face. The band's ends are square,
 with exact offset lines and arcs and mitred corners. The rim face and `position` stand for
-Fusion's edge chain and face guide.
+an edge chain and a face guide.
 
 **Draft** (`draft_deg`, trapezoidal section). The lip's reveal faces lean in going up, and the
 groove's matching wall narrows with depth. Both turn about their rim planes through the kernel's
@@ -292,12 +290,12 @@ enclosed void.
 **Refused:** a thickness that does not fit the profile; a top not above the floor by more than
 the thickness; profiles with arcs.
 
-**Not modelled:** Fusion's top-face limits, trimming at the body, per-side drafts. Wall
+**Not modelled:** top-face limits, trimming at the body, per-side drafts. Wall
 thickness is measured across the walls in the sketch plane.
 
 ## Draft
 
-Fusion's fixed-plane draft of existing faces.
+Fixed-plane draft of existing faces.
 
 **Inputs:** `faces` (planar faces to draft), `fixed` (the fixed plane, a face of the body),
 `parting` (optional: a sketch of lines, the parting line).
@@ -316,13 +314,13 @@ face replacement does not take (not a convex single loop of straight edges with 
 neighbours, or a vertex with more than one side edge, e.g. a wall with a hole or a filleted
 corner).
 
-**Two sides** (Fusion's parting-line draft with a planar parting line). Faces crossing the fixed
+**Two sides** (a parting-line draft with a planar parting line). Faces crossing the fixed
 plane are split along it, and each side leans in going away from the plane. This uses the
 kernel's polyhedral draft: every moved vertex is the intersection of its faces' planes, so the
 result is exact with no booleans. It needs planar faces with straight edges around the drafted
 faces.
 
-**Broken parting line** (`parting`: Fusion's parting-line draft with a sketch-curve parting tool,
+**Broken parting line** (`parting`: a parting-line draft with a sketch-curve parting tool,
 made of straight lines). The sketch's lines, joined end to end into one open chain, are swept
 along the sketch normal into a parting surface of planar strips; the sketch plane must contain
 the pull direction, and the chain must run across the pull with one height at every point and
@@ -340,9 +338,8 @@ does not cross it or crosses it more than once, a corner on a face's edge, a seg
 pull on a face, facet edges that would end on different edges of a piece, and what the planar
 draft refuses.
 
-How Fusion turns a broken parting curve into faces is not documented. The facet construction is
-R-CAD's own, and its volume is checked against an independent closed form (section areas
-integrated from the facet planes), not against Fusion.
+The facet construction for a broken parting curve is R-CAD's own, and its volume is checked
+against an independent closed form (section areas integrated from the facet planes).
 
 **Not modelled:** curved parting curves (arcs, splines), face and edge parting tools, Move
 Parting Line, a different angle on each side, tangent chains, drafts of curved faces.
@@ -380,7 +377,7 @@ corners it measures through the adjacent wall.
 
 ## Draft, Accessibility and Minimum Radius analyses
 
-Fusion's core Inspect tools for moulded parts, as read-only analyses of one body. Each report
+Inspection tools for moulded parts, as read-only analyses of one body. Each report
 has a summary, per-face results and per-triangle arrays for colouring the model in the app.
 
 - **`draft_analysis`** (`min_draft_deg` *rule* `DA`): signed draft `asin(n·pull)` per face and
@@ -407,7 +404,7 @@ builds an 80 × 50 enclosure from scratch:
 - two snap hooks from the lid catching windows in the base walls;
 - Design Advice on the base.
 
-It saves `examples/plastic_enclosure.rcad.json`. Order matters as in Fusion: the lip comes right
+It saves `examples/plastic_enclosure.rcad.json`. Order matters: the lip comes right
 after the shells, because the lip's band is joined to the rim, and once drafted features have
 made the body non-prismatic that join can fail.
 

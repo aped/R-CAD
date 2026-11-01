@@ -7,7 +7,7 @@ rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
 publish.workspace = true
-description = "R-CAD command-line runner for JSON command scripts, Fusion-style Python scripts, acceptance checks and the optional sync server"
+description = "R-CAD command-line runner for JSON command scripts, add-in API Python scripts, acceptance checks and the optional sync server"
 
 [dependencies]
 rcad-commands.workspace = true

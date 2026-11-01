@@ -19,7 +19,7 @@ which format versions a build reads and writes is listed in
   installed opens with that feature failed by name and keeps it. Commands `list_plugins`,
   `plugin_feature`, `set_plugin_data`, `run_plugin_analysis`; `rcad-cli plugins`. Native format
   v10 (written only when used). See `docs/PLUGINS.md`, ADR 0016.
-- **Plastics** (built-in plugin; Autodesk Fusion's Plastic tab as the reference):
+- **Plastics** (built-in plugin):
   - plastic rules: named nominal values that become parameters and bind new features, with
     material presets; assignable to bodies or assembly components; they also drive core Shell,
     Fillet, Extrude taper/thin and Thicken (`bind_rule_parameters`);
@@ -35,20 +35,20 @@ which format versions a build reads and writes is listed in
 
   See `docs/PLASTICS.md`.
 - Material catalog: PC, PC/ABS, PP, PA66, POM, HDPE.
-- **Fusion-style scripts.** `rcad-cli fusion-script SCRIPT.py [--out DOC] [--commands OUT.json]`
-  runs Python scripts written for a subset of the Fusion add-in API surface: sketches on
+- **Add-in API scripts.** `rcad-cli script SCRIPT.py [--out DOC] [--commands OUT.json]`
+  runs Python scripts written for a subset of the add-in scripting API surface: sketches on
   construction planes and faces, extrude, shell, fillet, user parameters, and the boss, rib,
-  web and plastic rule objects. A pure-Python `adsk` package (`compat/fusion/adsk`, an
+  web and plastic rule objects. A pure-Python `adsk` package (`compat/scripting/adsk`, an
   independent implementation from the public API reference) records the calls as R-CAD
   commands, converting from centimetres and radians and binding parameter expressions. The
   CLI then executes them like `run`. Members outside the subset fail by name. See
-  `docs/FUSION_SCRIPTS.md` and the examples in `compat/fusion/examples`.
-- **Fusion-style add-ins, headless.** `rcad-cli fusion-addin ADDIN_DIR [--list] [--command ID]
+  `docs/SCRIPTING.md` and the examples in `compat/scripting/examples`.
+- **Add-ins, headless.** `rcad-cli addin ADDIN_DIR [--list] [--command ID]
   [--input ID=VALUE ...] [--base SCRIPT.py]` checks the add-in's manifest, calls its `run`, and
   runs one of its commands without a user interface: command definitions, events and handlers,
   value, boolean, integer, drop-down, string, text and selection inputs, validation, a discarded
   preview, then `execute` and `stop`. `--list` prints the commands and their inputs as JSON.
-  Example: `compat/fusion/examples/addins/PlasticBoxAddin`.
+  Example: `compat/scripting/examples/addins/PlasticBoxAddin`.
 
 - **Optional sync server client.** R-CAD stays complete offline with no account; adding an
   account for a self-hosted server (protocol in `crates/rcad-cloud-proto`, documented routes,

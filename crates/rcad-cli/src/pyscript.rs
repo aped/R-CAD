@@ -1,8 +1,8 @@
-//! `rcad-cli fusion-script SCRIPT.py [--out DOC.rcad.json] [--commands OUT.json]`
-//! (docs/FUSION_SCRIPTS.md).
+//! `rcad-cli script SCRIPT.py [--out DOC.rcad.json] [--commands OUT.json]`
+//! (docs/SCRIPTING.md).
 //!
-//! Runs a Python script written for a subset of the Fusion add-in API surface under
-//! `python3 -I` with R-CAD's `adsk` package (compat/fusion, embedded in this binary and
+//! Runs a Python script written for a subset of the add-in scripting API surface under
+//! `python3 -I` with R-CAD's `adsk` package (compat/scripting, embedded in this binary and
 //! written to a private temporary directory) and a bootstrap that imports the script and
 //! calls its `run(context)`. The package records every call as R-CAD commands; they are
 //! then executed in a [`Session`] like `rcad-cli run`, printing one JSON line per step.
@@ -13,7 +13,7 @@
 //! along the sketch normal and checked by point membership.
 //!
 //! The temporary package, running the bootstrap and executing the recorded steps are
-//! shared with `rcad-cli fusion-addin` (`fusion_addin.rs`).
+//! shared with `rcad-cli addin` (`addin.rs`).
 //!
 //! Exit status: 0 success; 1 the script failed (Python error, unsupported member) or a
 //! step was refused; 2 the script or an output file could not be read or written, or
@@ -29,32 +29,32 @@ use std::process::ExitCode;
 /// The `adsk` package and the bootstrap, as (path in the temporary directory, text).
 const PACKAGE: &[(&str, &str)] = &[
     (
-        "rcad_fusion_bootstrap.py",
-        include_str!("../../../compat/fusion/rcad_fusion_bootstrap.py"),
+        "rcad_script_bootstrap.py",
+        include_str!("../../../compat/scripting/rcad_script_bootstrap.py"),
     ),
     (
         "adsk/__init__.py",
-        include_str!("../../../compat/fusion/adsk/__init__.py"),
+        include_str!("../../../compat/scripting/adsk/__init__.py"),
     ),
     (
         "adsk/_recorder.py",
-        include_str!("../../../compat/fusion/adsk/_recorder.py"),
+        include_str!("../../../compat/scripting/adsk/_recorder.py"),
     ),
     (
         "adsk/core.py",
-        include_str!("../../../compat/fusion/adsk/core.py"),
+        include_str!("../../../compat/scripting/adsk/core.py"),
     ),
     (
         "adsk/fusion.py",
-        include_str!("../../../compat/fusion/adsk/fusion.py"),
+        include_str!("../../../compat/scripting/adsk/fusion.py"),
     ),
     (
         "adsk/cam.py",
-        include_str!("../../../compat/fusion/adsk/cam.py"),
+        include_str!("../../../compat/scripting/adsk/cam.py"),
     ),
     (
         "adsk/_addin.py",
-        include_str!("../../../compat/fusion/adsk/_addin.py"),
+        include_str!("../../../compat/scripting/adsk/_addin.py"),
     ),
 ];
 
@@ -116,7 +116,7 @@ struct ScriptError {
 }
 
 fn usage() -> ExitCode {
-    esay!("usage: rcad-cli fusion-script SCRIPT.py [--out DOC.rcad.json] [--commands OUT.json]");
+    esay!("usage: rcad-cli script SCRIPT.py [--out DOC.rcad.json] [--commands OUT.json]");
     ExitCode::from(64)
 }
 
@@ -129,7 +129,8 @@ impl TempDir {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_nanos())
             .unwrap_or(0);
-        let dir = std::env::temp_dir().join(format!("rcad-fusion-{}-{nanos}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("rcad-pyscript-{}-{nanos}", std::process::id()));
         let mut b = std::fs::DirBuilder::new();
         #[cfg(unix)]
         {
@@ -147,7 +148,7 @@ impl Drop for TempDir {
     }
 }
 
-/// `fusion-script` with its arguments (after the word `fusion-script`).
+/// `script` with its arguments (after the word `script`).
 pub fn run(args: &[String]) -> ExitCode {
     let mut script = None;
     let (mut out, mut commands) = (None, None);
@@ -182,14 +183,13 @@ pub fn run(args: &[String]) -> ExitCode {
         esay!("cannot read {}: not a file", script.display());
         return ExitCode::from(2);
     }
-    let recorded =
-        Bootstrap::new().and_then(|b| b.run("fusion-script", &[script.as_os_str()], &script));
+    let recorded = Bootstrap::new().and_then(|b| b.run("script", &[script.as_os_str()], &script));
     let steps = match recorded {
         Ok(r) => r.steps,
         Err(code) => return code,
     };
     crate::load_plugins();
-    execute("fusion-script", steps, out.as_deref(), commands.as_deref())
+    execute("script", steps, out.as_deref(), commands.as_deref())
 }
 
 /// The `adsk` package and the bootstrap, written to a private temporary directory.
@@ -246,7 +246,7 @@ fn record(dir: &Path, tool: &str, args: &[&OsStr], source: &Path) -> Result<Reco
     let python = std::env::var_os("RCAD_PYTHON").unwrap_or_else(|| "python3".into());
     let output = std::process::Command::new(&python)
         .arg("-I")
-        .arg(dir.join("rcad_fusion_bootstrap.py"))
+        .arg(dir.join("rcad_script_bootstrap.py"))
         .args(args)
         .arg(&result_path)
         .stdin(std::process::Stdio::null())

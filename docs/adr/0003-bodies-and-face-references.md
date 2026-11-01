@@ -116,7 +116,7 @@ of a different kind. An edited line keeps its identity when its endpoints change
 
 ### Cuts that split a body (amendment, format v8)
 A single-region, straight-walled Extrude Cut that separates its target into several solids now
-makes one body per piece, as Autodesk Fusion does, instead of being refused:
+makes one body per piece instead of being refused:
 
 * The kernel's opt-in `*_pieces` operations (`cut_region_pieces`,
   `prismatic::prism_region_boolean_pieces`) return one closed shell per piece; the result check

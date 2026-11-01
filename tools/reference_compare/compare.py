@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""Compare R-CAD with Autodesk Fusion on the reference cases (docs/FUSION_SCRIPTS.md).
+"""Compare R-CAD with the reference application on the reference cases (docs/SCRIPTING.md).
 
-usage: tools/fusion_reference/compare.py [--fusion RESULTS.json] [--cli RCAD_CLI] [--out DIR]
+usage: tools/reference_compare/compare.py [--reference RESULTS.json] [--cli RCAD_CLI] [--out DIR]
 
-Each case is a Fusion API script. R-CAD runs it with `rcad-cli fusion-script` and measures
-the result; Fusion's measurements come from running RcadReference in Fusion, which writes
-fusion_results.json. Per body (matched by name, else by order):
-  - volume, to 1e-5 relative (both are exact B-rep integrals; Fusion at its very high
-    accuracy setting);
+Each case is an add-in API script. R-CAD runs it with `rcad-cli script` and measures
+the result; the reference measurements come from running RcadReference in the reference
+application, which writes reference_results.json. Per body (matched by name, else by order):
+  - volume, to 1e-5 relative (both are exact B-rep integrals; the reference at its very
+    high accuracy setting);
   - centre of mass, to 1e-3 mm;
-  - bounding box, to 1e-3 mm, advisory only (Fusion's body bounding box may be loose).
+  - bounding box, to 1e-3 mm, advisory only (the reference body bounding box may be loose).
 Cases with a hand-derived closed form also check R-CAD's volume against it (1e-9 relative),
 so a wrong case script is caught before blaming either modeller.
 
 Exit status: 0 every compared value agrees; 1 a mismatch, an error, or a case missing from
-the Fusion results; 2 no Fusion results (R-CAD's side is still measured and written).
+the reference results; 2 no reference results (R-CAD's side is still measured and written).
 """
 import argparse
 import json
@@ -24,14 +24,14 @@ import subprocess
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-HERE = os.path.join(REPO, "tools", "fusion_reference")
+HERE = os.path.join(REPO, "tools", "reference_compare")
 CASES = [
-    "tools/fusion_reference/cases/boss_plain.py",
-    "tools/fusion_reference/cases/boss_tip.py",
-    "tools/fusion_reference/cases/boss_drafted_root.py",
-    "tools/fusion_reference/cases/web_fillet_box.py",
-    "compat/fusion/examples/plate_with_hole.py",
-    "compat/fusion/examples/plastic_box.py",
+    "tools/reference_compare/cases/boss_plain.py",
+    "tools/reference_compare/cases/boss_tip.py",
+    "tools/reference_compare/cases/boss_drafted_root.py",
+    "tools/reference_compare/cases/web_fillet_box.py",
+    "compat/scripting/examples/plate_with_hole.py",
+    "compat/scripting/examples/plastic_box.py",
 ]
 PI = math.pi
 CLOSED = {
@@ -47,7 +47,7 @@ VOL_REL, COM_ABS, BOX_ABS = 1e-5, 1e-3, 1e-3
 def rcad_side(cli, case, out):
     name = os.path.splitext(os.path.basename(case))[0]
     doc = os.path.join(out, name + ".rcad.json")
-    r = subprocess.run([cli, "fusion-script", os.path.join(REPO, case), "--out", doc],
+    r = subprocess.run([cli, "script", os.path.join(REPO, case), "--out", doc],
                        capture_output=True, text=True)
     if r.returncode != 0:
         return name, {"error": (r.stderr or r.stdout).strip()[-2000:]}
@@ -72,7 +72,7 @@ def rcad_side(cli, case, out):
     return name, {"bodies": bodies}
 
 
-def fusion_bodies(entry):
+def reference_bodies(entry):
     return [{"name": b["name"], "volume_mm3": b["volume_cm3"] * 1000.0,
              "centroid_mm": [c * 10.0 for c in b["centroid_cm"]],
              "bbox_mm": [[c * 10.0 for c in b["bbox_cm"][0]], [c * 10.0 for c in b["bbox_cm"][1]]],
@@ -82,14 +82,15 @@ def fusion_bodies(entry):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--fusion", default=os.path.join(HERE, "RcadReference", "fusion_results.json"))
+    ap.add_argument("--reference", default=os.path.join(HERE, "RcadReference", "reference_results.json"))
     ap.add_argument("--cli", default=os.environ.get("RCAD_CLI", os.path.join(REPO, "target", "release", "rcad-cli")))
-    ap.add_argument("--out", default=os.path.join(REPO, "artifacts", "fusion_reference"))
+    ap.add_argument("--out", default=os.path.join(REPO, "artifacts", "reference_compare"))
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     out = os.path.realpath(a.out)
-    fusion = json.load(open(a.fusion)) if os.path.exists(a.fusion) else None
-    ok, report = True, {"fusion_version": fusion and fusion.get("fusion_version"), "cases": {}}
+    reference = json.load(open(a.reference)) if os.path.exists(a.reference) else None
+    ok, report = True, {"reference_version": reference and reference.get("reference_version"),
+                        "cases": {}}
     for case in CASES:
         name, ours = rcad_side(a.cli, case, out)
         rep = {"rcad": ours}
@@ -105,24 +106,24 @@ def main():
             ok &= good
             print(f"{name}: R-CAD volume {vol:.6f} vs closed form {CLOSED[name]:.6f} "
                   f"rel {err:.1e} -> {'PASS' if good else 'FAIL'}")
-        if fusion is None:
+        if reference is None:
             continue
-        entry = fusion["cases"].get(name)
+        entry = reference["cases"].get(name)
         if entry is None or "error" in entry:
             why = "missing" if entry is None else entry["error"].strip().splitlines()[-1]
-            print(f"{name}: Fusion result {why} -> FAIL")
+            print(f"{name}: reference result {why} -> FAIL")
             ok = False
             continue
-        theirs = fusion_bodies(entry)
-        rep["fusion"] = theirs
+        theirs = reference_bodies(entry)
+        rep["reference"] = theirs
         by_name = {b["name"]: b for b in theirs}
         if len(theirs) != len(ours["bodies"]):
-            print(f"{name}: {len(ours['bodies'])} R-CAD bodies, {len(theirs)} Fusion bodies -> FAIL")
+            print(f"{name}: {len(ours['bodies'])} R-CAD bodies, {len(theirs)} reference bodies -> FAIL")
             ok = False
         for i, b in enumerate(ours["bodies"]):
             f = by_name.get(b["name"]) or (theirs[i] if i < len(theirs) else None)
             if f is None:
-                print(f"{name} {b['name']}: no Fusion body -> FAIL")
+                print(f"{name} {b['name']}: no reference body -> FAIL")
                 ok = False
                 continue
             dv = abs(b["volume_mm3"] - f["volume_mm3"]) / max(abs(f["volume_mm3"]), 1.0)
@@ -130,15 +131,15 @@ def main():
             db = max(abs(x - y) for p, q in zip(b["bbox_mm"], f["bbox_mm"]) for x, y in zip(p, q))
             good = dv <= VOL_REL and dc <= COM_ABS and f["is_solid"]
             ok &= good
-            print(f"{name} {b['name']}: volume {b['volume_mm3']:.6f} vs Fusion {f['volume_mm3']:.6f} "
+            print(f"{name} {b['name']}: volume {b['volume_mm3']:.6f} vs reference {f['volume_mm3']:.6f} "
                   f"(rel {dv:.1e}), centroid diff {dc:.2e} mm, bbox diff {db:.2e} mm"
                   f"{' (advisory)' if db > BOX_ABS else ''} -> {'PASS' if good else 'FAIL'}")
     json.dump(report, open(os.path.join(out, "compare.json"), "w"), indent=1)
-    if fusion is None:
-        print(f"Fusion results not found at {a.fusion}: Fusion comparison NOT RUN "
-              "(run RcadReference in Fusion first)")
+    if reference is None:
+        print(f"reference results not found at {a.reference}: reference comparison NOT RUN "
+              "(run RcadReference in the reference application first)")
         sys.exit(2 if ok else 1)
-    print("Fusion comparison: " + ("PASS" if ok else "FAIL"))
+    print("reference comparison: " + ("PASS" if ok else "FAIL"))
     sys.exit(0 if ok else 1)
 
 

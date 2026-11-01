@@ -1,7 +1,7 @@
 """``adsk.core`` subset: Application, UserInterface, Point3D, ValueInput,
 ObjectCollection, and the add-in command model: command definitions, events
 and handlers, commands and command inputs, toolbar placement stubs
-(docs/FUSION_SCRIPTS.md)."""
+(docs/SCRIPTING.md)."""
 
 import math
 import sys
@@ -87,9 +87,9 @@ class Application(Base):
         if Application._instance is None:
             Application._instance = Application()
             Application._instance._ui = UserInterface()
-            from adsk import fusion
+            import adsk.fusion
 
-            Application._instance._design = fusion.Design()
+            Application._instance._design = adsk.fusion.Design()
         return Application._instance
 
     @property
@@ -1230,11 +1230,11 @@ class SelectionCommandInput(CommandInput):
         return self._selections[index]
 
     def _accepts(self, entity):
-        from adsk import fusion
+        import adsk.fusion
 
-        if isinstance(entity, fusion.BRepFace):
+        if isinstance(entity, adsk.fusion.BRepFace):
             ok = _FACE_FILTERS
-        elif isinstance(entity, fusion.BRepBody):
+        elif isinstance(entity, adsk.fusion.BRepBody):
             ok = _BODY_FILTERS
         else:
             return False
@@ -1422,7 +1422,7 @@ class CommandInputs(Collection):
 # ---------------------------------------------------------------------------
 # Workspaces, toolbars and controls: placement is recorded (for --list); there
 # is no user interface. An unknown id gives a placeholder, since the built-in
-# ids of the Fusion user interface are not modelled.
+# ids of the reference application's user interface are not modelled.
 
 
 class CommandControl(Base):

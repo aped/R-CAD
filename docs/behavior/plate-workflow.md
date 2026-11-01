@@ -1,7 +1,7 @@
 # Plate-with-hole workflow: behaviour spec
 
 Labels: **[spec]** from the product requirements; **[assumed]** our product decision; **[observed]** measured in this repo.
-No reference application was used (Fusion not available) → reference validation pending.
+No reference application was used (reference application not available) → reference validation pending.
 
 ## Feature model
 1. `Sketch` on `WorldXY`: dimensioned centred rectangle. Constraints: 2 horizontal, 2 vertical,
