@@ -10,7 +10,7 @@
 //!   the other half, the same footprint, facing the first).
 //!
 //! Bands are exact offsets of the rim's boundary (parallel lines,
-//! concentric arcs, mitred corners). Fusion's edge-chain selection, face
+//! concentric arcs, mitred corners). Edge-chain selection, face
 //! guide, extents and trapezoidal sections are not modelled: the rim face
 //! stands for the edge chain, and sections are rectangular.
 use crate::util::{EPS, SINK, invalid, prism, unsupported};
@@ -281,7 +281,7 @@ impl Piece {
 /// The band between offsets `d0 < d1` (outward of the counter-clockwise
 /// rim loop `lp`) along the loop from the point nearest `from` to the point
 /// nearest `to`, as one simple region: exact offset lines and concentric
-/// arcs, mitred at sharp line corners, square at its ends (Fusion's lip
+/// arcs, mitred at sharp line corners, square at its ends (the lip's
 /// extents).
 fn chain_band(
     lp: &Profile,

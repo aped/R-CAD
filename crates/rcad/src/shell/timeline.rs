@@ -1,4 +1,4 @@
-//! Bottom timeline strip (Fusion's timeline): one marker per feature in
+//! Bottom timeline strip: one marker per feature in
 //! history order, tinted by health, rolled-back features dimmed after the
 //! history marker. Drag the history marker between features to roll back
 //! (`SetRollback`), double-click a feature to edit it, right-click for Edit

@@ -1,5 +1,5 @@
-# keymap: fusion
-# Fusion-style flow with real input: ribbon sketch on XY, R / D keys,
+# keymap: standard
+# Standard-layer flow with real input: ribbon sketch on XY, R / D keys,
 # FINISH SKETCH, E opens the docked Extrude dialog, a joined boss,
 # then double-click Extrude2 in History (Edit Feature) to make it a
 # symmetric Cut (15 mm centred on XY: 7.5 mm into the plate); Ctrl+Z restores the Join.
@@ -9,7 +9,7 @@ clickw Planes
 clickw Sketch on XY
 wait_idle
 expect editing.dims 0
-# Fusion R: 2-point rectangle from the origin.
+# Standard-layer R: 2-point rectangle from the origin.
 key r
 sclick 0.3 0.2
 smove 40 30

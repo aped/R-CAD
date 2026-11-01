@@ -1,5 +1,5 @@
 //! Planar arrangement of the sketch's curves: regions from curves that cross,
-//! touch or meet at T-junctions (as Fusion offers them), when the loops are
+//! touch or meet at T-junctions, when the loops are
 //! not disjoint simple loops (the ordinary path in `region.rs`).
 //!
 //! Lines, arcs and circles are split at their intersections (exact analytic

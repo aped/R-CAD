@@ -1,4 +1,4 @@
-//! Browser nodes in Fusion's order: Document Settings (units), Named Views,
+//! Browser nodes in this order: Document Settings (units), Named Views,
 //! Origin, then Bodies, Sketches, Construction; Origin planes start sketches,
 //! Named Views set the camera, Sketches rows select and edit.
 use std::time::{Duration, Instant};
@@ -37,7 +37,7 @@ fn click(h: &mut Harness<'_, RcadApp>, label: &str) {
 }
 
 #[test]
-fn browser_nodes_follow_fusion_order_and_act() {
+fn browser_nodes_follow_settings_views_origin_order_and_act() {
     let mut h = harness();
     click(&mut h, "New");
     h.state_mut().request(Command::CreateSketch {

@@ -14,7 +14,7 @@
 //! Wall thickness is measured across the walls in the sketch plane. Drafted
 //! rests take circles and line loops (a drafted loop with arcs is refused by
 //! the kernel's tapered tool).
-//! Not modelled: Fusion's top-face limits, trimming at the body and
+//! Not modelled: top-face limits, trimming at the body and
 //! per-side drafts.
 use crate::util::{EPS, closed_profiles, invalid, prism};
 use crate::{choice, input, param};

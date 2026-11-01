@@ -364,8 +364,8 @@ impl Model {
     }
 
     /// [`Model::transact`], except that features downstream of `edited`
-    /// that newly fail are committed flagged in their health (Edit Feature,
-    /// as in Fusion); `edited` itself must still evaluate.
+    /// that newly fail are committed flagged in their health (Edit Feature);
+    /// `edited` itself must still evaluate.
     pub fn transact_allowing<T>(
         &mut self,
         label: &str,

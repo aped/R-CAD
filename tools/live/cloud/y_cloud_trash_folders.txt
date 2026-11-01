@@ -1,4 +1,4 @@
-# keymap: fusion
+# keymap: standard
 # Folders, rename, move and trash against a running R-CAD server (not part of the
 # default walkthrough): http://127.0.0.1:18640 with user alice / alice-pass-123,
 # organization Home and project Parts already present. Creates folder Fixtures,

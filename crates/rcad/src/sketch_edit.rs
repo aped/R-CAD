@@ -458,7 +458,7 @@ pub struct SketchEditor {
     pub projected: std::collections::BTreeMap<EntityId, usize>,
     /// A Project / Intersect click waiting for the app.
     pub project_pick: Option<ProjectPick>,
-    /// Project tool option: keep the projection link (Fusion's Projection Link).
+    /// Project tool option: keep the projection link.
     pub project_linked: bool,
     /// Evaluated user parameters (name -> value), for dimension expressions.
     pub param_env: std::collections::HashMap<String, rcad_document::params::Quantity>,
@@ -2386,8 +2386,8 @@ impl SketchEditor {
         }
         let idx = self.sketch.constraints.len();
         if self.sketch.dimension_is_redundant(&c) {
-            // Redundant: added as a driven (measuring) dimension, Fusion's
-            // behaviour, instead of being refused.
+            // Redundant: added as a driven (measuring) dimension
+            // instead of being refused.
             let mut c = c;
             let name = match c.dimension_mut() {
                 Some(d) => {

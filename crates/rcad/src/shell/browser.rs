@@ -1,4 +1,4 @@
-//! Browser tree nodes in Fusion's order: Document Settings (units), Named
+//! Browser tree nodes, in this order: Document Settings (units), Named
 //! Views, Origin (the world planes), then the document's sections, Bodies
 //! (with Components), Sketches and Construction. The first three are node
 //! menus on the Browser heading's row (shown as Settings / Views / Origin) so

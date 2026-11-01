@@ -1,6 +1,6 @@
 //! Editing a configured parameter while a configuration is active stores
-//! the edit in that configuration's row (as Fusion edits the active
-//! configuration), so switching away and back does not silently revert it;
+//! the edit in that configuration's row (the active configuration is the
+//! one edited), so switching away and back does not silently revert it;
 //! an unconfigured parameter stays shared. Volumes closed-form.
 use crate::support;
 use rcad_commands::Session;

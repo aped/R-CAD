@@ -1,4 +1,4 @@
-# keymap: fusion
+# keymap: standard
 # Members and organization administration against a running R-CAD server (not
 # part of the default walkthrough): http://127.0.0.1:18640 with users alice
 # (password alice-pass-123, owner of organization Home) and bob (a member of

@@ -116,8 +116,8 @@ fn registry_buttons_and_keys_run_the_same_action() {
     );
     click(&mut h, "New");
     assert!(h.state().summary().open);
-    // Fusion layer (default): E opens Extrude once a sketch exists.
-    assert_eq!(h.state().keymap(), KeymapLayer::Fusion);
+    // Standard layer (default): E opens Extrude once a sketch exists.
+    assert_eq!(h.state().keymap(), KeymapLayer::Standard);
     h.get_by_label("Templates").click();
     let _ = h.try_run();
     click(&mut h, "Rectangle on XY…");
@@ -134,8 +134,8 @@ fn registry_buttons_and_keys_run_the_same_action() {
     h.key_press(Key::E);
     settle(&mut h);
     assert!(h.query_by_label("Extrude distance (mm)").is_none());
-    // Fusion F (Fillet) without a face: refused with the reason, nothing opens.
-    h.state_mut().set_keymap(KeymapLayer::Fusion);
+    // Standard-layer F (Fillet) without a face: refused with the reason, nothing opens.
+    h.state_mut().set_keymap(KeymapLayer::Standard);
     h.key_press(Key::F);
     settle(&mut h);
     let last = h.state().diagnostics().last().cloned().expect("message");

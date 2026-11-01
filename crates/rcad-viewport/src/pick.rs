@@ -6,7 +6,7 @@
 //! into a world distance at each depth ([`PixelTolerance`]). It is a display
 //! quantity and is independent of the model tolerances of the geometry
 //! kernel. An edge or vertex hidden behind the face hit is not picked.
-//! Priority, as in Fusion: a vertex within tolerance wins over an edge, an
+//! Priority: a vertex within tolerance wins over an edge, an
 //! edge over a face.
 //!
 //! The ids carried here are whatever the caller supplies (provisional ids of

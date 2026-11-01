@@ -28,10 +28,10 @@ for script in "$LIVE_DIR"/*.txt; do
   case "$dir" in "$OUT"/?*) ;; *) echo "refusing to clear $dir"; exit 2 ;; esac
   if [ -d "${dir:?}" ]; then rm -rf -- "${dir:?}"; fi
   mkdir -p "$dir/shots"
-  # Key layer: classic unless the script opts in with a "# keymap: fusion" line;
+  # Key layer: classic unless the script opts in with a "# keymap: standard" line;
   # preferences live in the script's own directory (never the user's).
   keymap=classic
-  grep -qx '# keymap: fusion' "$script" && keymap=fusion
+  grep -qx '# keymap: standard' "$script" && keymap=standard
   RCAD_KEYMAP=$keymap XDG_CONFIG_HOME="$dir/config" XDG_CACHE_HOME="$dir/cache" \
   RCAD_TRACE_INPUT=1 RCAD_PROBE="$dir/probe.json" RCAD_RECOVERY_DIR="$dir/recovery" \
     "$ROOT/tools/headless_session.sh" "$dir" 1280x800 "$APP" --maximized --shot-dir "$dir/shots" \

@@ -1,5 +1,5 @@
 //! Exact draft of planar faces about a broken (polyline) parting line:
-//! Fusion's Parting Line draft with a sketch-curve parting tool made of
+//! a parting-line draft whose parting tool is sketch curves made of
 //! straight segments.
 //!
 //! The parting surface is the polyline swept along `across` (the normal of

@@ -115,8 +115,8 @@ fn split_refusals_leave_the_document_unchanged() {
 }
 
 /// A U-shaped body split across both arms: the side behind the plane falls
-/// apart into the two arm tops, which become separate bodies (one per piece,
-/// as Fusion does), in the same undo step; save/reopen as format v8.
+/// apart into the two arm tops, which become separate bodies (one per
+/// piece), in the same undo step; save/reopen as format v8.
 #[test]
 fn a_side_that_falls_apart_makes_one_body_per_piece() {
     let mut u = Session::new();

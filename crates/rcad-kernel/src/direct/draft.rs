@@ -1,6 +1,6 @@
 //! Exact draft of planar faces of a polyhedral region, one- or two-sided
-//! about a parting plane (Fusion's Fixed Plane / Parting Line drafts on
-//! planar walls).
+//! about a parting plane (fixed-plane and parting-line drafts of planar
+//! walls).
 //!
 //! Construction, without booleans:
 //! * two-sided: every selected face that crosses the parting plane is split

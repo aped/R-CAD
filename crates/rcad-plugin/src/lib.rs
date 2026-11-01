@@ -468,7 +468,7 @@ pub trait Plugin: Send + Sync {
     /// Rule templates for slots of core features (not this plugin's): core
     /// feature kind (`shell_face`, `fillet_loop`, `extrude`, ...) → slot →
     /// template over rule symbols. The host binds them on request
-    /// (`bind_rule_parameters`), like Fusion's rule parameters feeding Shell,
+    /// (`bind_rule_parameters`), so rule parameters can feed Shell,
     /// Fillet and Draft.
     fn core_rule_templates(&self, kind: &str) -> BTreeMap<String, String> {
         let _ = kind;
@@ -476,7 +476,7 @@ pub trait Plugin: Send + Sync {
     }
 
     /// [`Plugin::rule_symbols`] for a body that may belong to an assembly
-    /// component (rules can be assigned to components, as in Fusion).
+    /// component (rules can be assigned to components).
     /// Hosts call this; the default ignores the component.
     fn rule_symbols_in(
         &self,

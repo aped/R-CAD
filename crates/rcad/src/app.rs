@@ -474,7 +474,7 @@ pub struct RcadApp {
     /// Picking hierarchy of `scene.mesh` (built with each new scene; None when
     /// the mesh is not valid, then clicks pick by the plain scan).
     pub(crate) scene_picker: Option<rcad_viewport::PickScene>,
-    /// Display isolation (Fusion's Isolate; view state only, not in the
+    /// Display isolation (Isolate; view state only, not in the
     /// document or undo): only this body is drawn and picked. `full_scene`
     /// keeps every visible body to restore.
     pub(crate) isolated: Option<rcad_document::BodyId>,
@@ -2364,7 +2364,7 @@ impl RcadApp {
         });
         egui::Panel::bottom("rcad_status").show(ui, |ui| self.status_bar(ui, busy));
         use crate::shell::prefs::{PANEL_MAX, PANEL_MIN};
-        // The Data panel sits left of the browser (Fusion's Data Panel).
+        // The Data panel sits left of the browser.
         #[cfg(feature = "cloud")]
         if self.cloud.panel_open {
             egui::Panel::left("rcad_cloud")

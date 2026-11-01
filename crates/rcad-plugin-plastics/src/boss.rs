@@ -1,7 +1,7 @@
 //! Boss (docs/PLASTICS.md "Boss"): screw bosses at sketch points, with an
 //! optional pilot or through hole, gusset ribs and a mating boss with a
-//! clearance hole and counterbore on a second body (Fusion's Side 1 /
-//! Side 2).
+//! clearance hole and counterbore on a second body (side 1 /
+//! side 2).
 //!
 //! Per placement point `i` (operation ids `32·i + part`, stable while points
 //! keep their order):
@@ -16,7 +16,7 @@
 //!   `hole_draft_deg` (widening towards the top);
 //! * parts 2..: gusset ribs, a section from the axis to `rib_length` with
 //!   a flat top at `rib_height` chamfered over the last `rib_chamfer` down to
-//!   `rib_tip_height` (Fusion's chamfer profile),
+//!   `rib_tip_height` (a chamfered profile),
 //!   `rib_thickness` thick, sunk [`SINK`] into the base, evenly over
 //!   `rib_total_deg` from `rib_angle_deg` (sketch x axis);
 //! * parts 16..18 (with a `mate` face): a mating shank of `mate_diameter`

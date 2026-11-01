@@ -22,8 +22,7 @@
 //! `clearance` beside the beam out `loop_length` past the catch, which must
 //! reach the mate body. Operation ids `8·i + part` (0 hook, 1 groove/loop).
 //!
-//! Not modelled: base fillet, deflection/strain check (Fusion has none
-//! either).
+//! Not modelled: base fillet, deflection/strain check.
 use crate::util::{EPS, SINK, invalid, placement_points, prism, standing};
 use crate::{choice, input, param};
 use rcad_plugin::geom::{footprint_of, next_below_over, scale};

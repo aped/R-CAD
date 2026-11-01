@@ -133,8 +133,7 @@ impl Widget for IconButton<'_> {
     }
 }
 
-/// A group title centred in a row under the group's buttons (Fusion's
-/// ribbon); clicking it opens the group dropdown. Accessible name: the group
+/// A group title centred in a row under the group's buttons; clicking it opens the group dropdown. Accessible name: the group
 /// label.
 pub struct GroupTitle<'a> {
     pub label: &'a str,
@@ -606,7 +605,7 @@ impl RcadApp {
             .resizable(false)
             .show(ctx, |ui| {
                 ui.label(RichText::new("Keyboard").strong());
-                for l in [KeymapLayer::Fusion, KeymapLayer::Classic] {
+                for l in [KeymapLayer::Standard, KeymapLayer::Classic] {
                     changed |= ui
                         .radio_value(&mut self.shell.prefs.keymap, l, l.label())
                         .named(&format!("Keys {}", l.label()))

@@ -3,8 +3,7 @@
 //! exact face kinds plus a closed tessellation ([`rcad_plugin::BodyMesh`]).
 //! Read-only; reports are JSON with per-face results, summary totals and
 //! per-triangle arrays (indexed like `BodyMesh::triangles`, `null` for
-//! degenerate triangles) for viewport colouring. Autodesk Fusion's core
-//! Inspect tools of the same names are the behavioural reference.
+//! degenerate triangles) for viewport colouring.
 //!
 //! The mesh is checked as for Design Advice ([`crate::advice`]): finite,
 //! index-consistent, outward oriented, plane triangles agreeing with their
@@ -25,7 +24,7 @@
 //! triangles, which must agree); every other face reports the minimum and
 //! maximum over its triangles and the class `mixed` when they span several.
 //! Triangles of exact faces carry the exact value. `max_draft_deg` sets the
-//! colour range `[−max, max]` (Fusion's draft-angle range); values beyond it
+//! colour range `[−max, max]` (the draft-angle range); values beyond it
 //! are reported unclamped.
 //!
 //! # Accessibility (`accessibility`)

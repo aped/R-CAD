@@ -2791,7 +2791,7 @@ fn extrude_feature(
             }
             let t_apply = std::time::Instant::now();
             // One region, straight walls: a cut that separates the target
-            // into pieces makes one body per piece (as Fusion does).
+            // into pieces makes one body per piece.
             let split = opts.taper == 0.0 && extra.is_empty();
             let target_mesh = st.bodies.get(&target).and_then(|b| b.check_mesh.clone());
             let (mut cut, used, mut mesh) = if opts.taper != 0.0 {
