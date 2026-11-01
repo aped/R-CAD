@@ -295,7 +295,8 @@ thickness is measured across the walls in the sketch plane.
 
 Fusion's fixed-plane draft of existing faces.
 
-**Inputs:** `faces` (planar faces to draft), `fixed` (the fixed plane, a face of the body).
+**Inputs:** `faces` (planar faces to draft), `fixed` (the fixed plane, a face of the body),
+`parting` (optional: a sketch of lines, the parting line).
 
 **Parameters:** `draft_deg` (1, *rule* `DA`, 0–30).
 
@@ -317,7 +318,30 @@ kernel's polyhedral draft: every moved vertex is the intersection of its faces' 
 result is exact with no booleans. It needs planar faces with straight edges around the drafted
 faces.
 
-**Not modelled:** curved (non-planar) parting lines, tangent chains, drafts of curved faces.
+**Broken parting line** (`parting`: Fusion's parting-line draft with a sketch-curve parting tool,
+made of straight lines). The sketch's lines, joined end to end into one open chain, are swept
+along the sketch normal into a parting surface of planar strips; the sketch plane must contain
+the pull direction, and the chain must run across the pull with one height at every point and
+extend past the faces. Every face to draft must cross it once. Each face is split along it: new
+vertices where its edges cross the surface and at the chain's corners on the face. Each drafted
+piece turns about its own parting segment by the angle (`two_sides`: both sides, each leaning in
+going away from the line; `one_side`: the pull side only). A piece over a corner becomes one
+planar facet per segment; the facets meet in straight edges from the corners to its far edge,
+whose neighbour (a cap) is not drafted. Every moved vertex is the intersection of its faces'
+planes, as for the planar parting line, so the result is exact.
+
+Refused with the reason: arcs or circles in the parting sketch (the strips would be curved), a
+chain that is broken, branches or turns back, a line that does not span the faces, a face that
+does not cross it or crosses it more than once, a corner on a face's edge, a segment along the
+pull on a face, facet edges that would end on different edges of a piece, and what the planar
+draft refuses.
+
+How Fusion turns a broken parting curve into faces is not documented. The facet construction is
+R-CAD's own, and its volume is checked against an independent closed form (section areas
+integrated from the facet planes), not against Fusion.
+
+**Not modelled:** curved parting curves (arcs, splines), face and edge parting tools, Move
+Parting Line, a different angle on each side, tangent chains, drafts of curved faces.
 
 ## Design Advice
 
@@ -404,13 +428,13 @@ closed forms to 1e-6 relative, with point probes:
 - bosses with gussets, with tip fillets and with root fillets;
 - a drafted rest;
 - a lip and groove, also drafted;
-- a two-sided draft;
+- a two-sided draft, and one about a broken (roof-shaped) parting line;
 - a snap-fit groove;
 - a drafted box;
 - a web along an arc, also with root fillets;
 - the enclosure example.
 
-FreeCAD (OpenCascade) reads each of the 16 bodies as one valid solid. Volumes agree with the
+FreeCAD (OpenCascade) reads each of the 17 bodies as one valid solid. Volumes agree with the
 closed forms within 2e-9 relative, and with R-CAD's own for the enclosure.
 
 **More command tests** (same directory): boss tip fillets against the cap-loop oracle, rib to

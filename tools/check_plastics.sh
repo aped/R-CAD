@@ -4,7 +4,7 @@
 # Builds cases with the release rcad-cli (RCAD_CLI overrides the binary), exports each body to
 # STEP and checks with FreeCAD: exactly one valid solid, and its volume
 #   - against a closed form computed here (bosses with gussets, a drafted rest, a lip and its
-#     groove, a snap-fit groove, root fillets along an arc), to 5e-5 relative: OpenCascade's integration of our exports
+#     groove, a snap-fit groove, root fillets along an arc, a broken parting-line draft), to 5e-5 relative: OpenCascade's integration of our exports
 #     differs by up to ~1e-5 relative (no pcurves on planar faces, see tools/check_revolved.sh);
 #     the command tests assert the exact volumes to 1e-6;
 #   - for the full plastic enclosure example (no closed form), against R-CAD's own volume to
@@ -125,6 +125,42 @@ cases["draft_two_sided"] = ([{"cmd": "new_document"}, rect("WorldXY", 40.0, 30.0
                  "fixed": fc({"Offset": {"base": {"Face": face(2, "ExtrudeStartCap")}, "distance": -10.0}})},
        {"draft_deg": 3.0}, {"sides": "two_sides"})],
     {1: 2 * 10 / 6 * (area3(0) + 4 * area3(5) + area3(10))})
+# M. Broken (roof-shaped) parting line, 3 deg both sides, on a 40 x 30 x 20 box: z 8 at x +-30,
+# 12 at x 0, swept along y. Each facet is inset by tan(a) times the in-plane distance to its own
+# segment (max of the two above the line, min below, split on the bisector); the side walls hinge
+# at the parting height 28/3. Section areas are exact trapezoids in x between the kinks,
+# integrated in z by Simpson between the kinks in z (quadratic pieces).
+def roof_box(h, a):
+    t, c, zs = math.tan(a), 1 / math.sqrt(1 + (4 / 30) ** 2), 28 / 3
+    zl, zr = (lambda x: 12 + 4 * x / 30), (lambda x: 12 - 4 * x / 30)
+    def inset(x, z):
+        if z >= 12 - 4 * abs(x) / 30:
+            return max((z - zl(x)) * c, (z - zr(x)) * c)
+        return min((zl(x) - z) * c, (zr(x) - z) * c)
+    def area(z):
+        xmax = 20 - t * abs(z - zs)
+        xs = [-xmax, 0.0, xmax] + ([-30 * (12 - z) / 4, 30 * (12 - z) / 4] if 8 <= z <= 12 else [])
+        xs = sorted(x for x in xs if abs(x) <= xmax)
+        f = lambda x: 30 - 2 * t * inset(x, z)
+        return sum((b - a_) * (f(a_) + f(b)) / 2 for a_, b in zip(xs, xs[1:]))
+    cuts = sorted([0.0, h] + [z for z in (zs, 12.0) if z < h])
+    total = 0.0
+    for z0, z1 in zip(cuts, cuts[1:]):
+        n = 64
+        dz = (z1 - z0) / n
+        total += sum(dz / 6 * (area(z0 + i * dz) + 4 * area(z0 + (i + 0.5) * dz) + area(z0 + (i + 1) * dz))
+                     for i in range(n))
+    return total
+roof_sketch = {"cmd": "create_sketch", "plane": "WorldXZ", "template": "custom", "sketch": {
+    "points": [{"id": i, "x": x, "y": y} for i, (x, y) in enumerate([(-30.0, 8.0), (0.0, 12.0), (30.0, 8.0)])],
+    "entities": [{"Line": {"id": 1, "a": 0, "b": 1}}, {"Line": {"id": 2, "a": 1, "b": 2}}],
+    "constraints": [{"FixedPoint": {"p": i, "x": x, "y": y}} for i, (x, y) in enumerate([(-30.0, 8.0), (0.0, 12.0), (30.0, 8.0)])]}}
+cases["draft_parting_roof"] = ([{"cmd": "new_document"}, rect("WorldXY", 40.0, 30.0), {"cmd": "extrude", "sketch": 1, "distance": 20.0},
+    roof_sketch,
+    pf("draft", {"faces": {"kind": "faces", "faces": [face(2, {"ExtrudeSide": {"entity": e}}) for e in range(1, 5)]},
+                 "fixed": fc({"Face": face(2, "ExtrudeStartCap")}), "parting": sk(3)},
+       {"draft_deg": 3.0}, {"sides": "two_sides"})],
+    {1: roof_box(20.0, math.radians(3))})
 # L. The half-circle web with root fillets (r 1) on both walls: Pappus about the arc's centre,
 # centroids at 11 + d and 9 - d, swept through pi.
 d1 = f * (10 - 3 * math.pi) / (12 - 3 * math.pi)

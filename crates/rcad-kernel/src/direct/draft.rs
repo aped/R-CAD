@@ -215,6 +215,20 @@ pub fn draft_faces(
         let n1 = (n * angle.cos() + t * angle.sin()).normalize();
         new_plane.insert(f, (p0, n1));
     }
+    finish(sh, &old_shell, &new_plane, tol)
+}
+
+/// Move every vertex of the faces in `new_plane` to the intersection of the
+/// planes of the faces meeting there (the new planes where given), make the
+/// edges at them straight, give those faces their new planes, and check
+/// every touched loop (simple, same sense as in `old_shell`), the edges on
+/// their faces and the closed shell.
+pub(super) fn finish(
+    mut sh: CS,
+    old_shell: &CS,
+    new_plane: &BTreeMap<usize, (Point3, Vector3)>,
+    tol: f64,
+) -> Result<Body> {
     // Faces of each vertex (after splitting).
     let vf = vertex_faces(&sh);
     let changed: BTreeSet<usize> = new_plane.keys().copied().collect();
@@ -287,7 +301,7 @@ pub fn draft_faces(
             touched.insert(e);
         }
     }
-    for (&f, &(o1, n1)) in &new_plane {
+    for (&f, &(o1, n1)) in new_plane {
         let s_old = match &sh.faces[f].surface {
             Surface::Plane(pl) => pl.normal(),
             _ => return Err(invalid("draft: face is not planar")),
@@ -358,7 +372,7 @@ pub fn draft_faces(
 }
 
 /// No two non-adjacent segments of the closed polygon cross.
-fn simple_loop(p: &[[f64; 2]]) -> bool {
+pub(super) fn simple_loop(p: &[[f64; 2]]) -> bool {
     let n = p.len();
     let cross = |o: [f64; 2], a: [f64; 2], b: [f64; 2]| {
         (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])

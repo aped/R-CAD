@@ -229,6 +229,12 @@ pub enum Op {
     /// `two_sided` the faces crossing the plane are split and the far side
     /// leans in going the other way. The kernel's polyhedral draft: every
     /// moved vertex is the intersection of its faces' planes (no booleans).
+    ///
+    /// With `parting` (at least two points on a plane containing the pull,
+    /// normal `parting_across`), the parting line is that polyline swept
+    /// along `parting_across` instead of the plane: faces are split along
+    /// it and each piece turns about its own segments (one planar facet per
+    /// segment); `plane_point` and `plane_normal` are then unused.
     DraftFaces {
         id: u32,
         body: String,
@@ -239,6 +245,10 @@ pub enum Op {
         angle_deg: f64,
         #[serde(default)]
         two_sided: bool,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        parting: Vec<[f64; 3]>,
+        #[serde(default)]
+        parting_across: [f64; 3],
         #[serde(default)]
         label: String,
     },
@@ -568,6 +578,8 @@ pub fn check_ops(req: &BuildRequest, ops: &[Op]) -> Result<(), PluginError> {
             plane_normal,
             pull,
             angle_deg,
+            parting,
+            parting_across,
             label,
             ..
         } = op
@@ -577,6 +589,19 @@ pub fn check_ops(req: &BuildRequest, ops: &[Op]) -> Result<(), PluginError> {
                 req.feature,
                 if label.is_empty() { "draft" } else { label }
             );
+            if !parting.is_empty()
+                && (parting.len() < 2
+                    || !parting
+                        .iter()
+                        .flatten()
+                        .chain(parting_across)
+                        .all(|v| v.is_finite())
+                    || geom::norm(*parting_across) < 1e-12)
+            {
+                return Err(PluginError::Failed(format!(
+                    "{what}: a parting line needs at least two finite points and a sweep direction"
+                )));
+            }
             let bad = |m: &str| Err(PluginError::Failed(format!("{what}: {m}")));
             if !ids.insert(*id) {
                 return bad("operation id repeated");
