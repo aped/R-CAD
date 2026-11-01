@@ -1106,7 +1106,7 @@ pub enum Command {
     /// feature type; a body id 0 in a New Body operation means "the body the
     /// feature created before, or a new one". References are re-validated;
     /// the edit is refused when the feature itself fails, while dependents
-    /// that break are committed flagged in health (as in Fusion).
+    /// that break are committed flagged in health.
     RedefineFeature {
         feature: FeatureId,
         kind: Box<FeatureKind>,
@@ -3186,7 +3186,7 @@ impl Session {
                 let n = curves.iter().map(Vec::len).sum::<usize>();
                 // Where the last regeneration put this sketch's points: new
                 // projected curves share the end points of earlier projected
-                // ones they meet (Fusion's projected edges are connected).
+                // ones they meet (projected edges stay connected).
                 let solved_pts: std::collections::HashMap<rcad_sketch::PointId, [f64; 2]> = m
                     .evaluation()
                     .features

@@ -1,5 +1,4 @@
-//! Rectangular (two-direction) linear pattern, as Fusion's rectangular
-//! pattern: a 3 x 2 grid of compartment pockets in a tray from one seed;
+//! Rectangular (two-direction) linear pattern: a 3 x 2 grid of compartment pockets in a tray from one seed;
 //! closed-form volume; counts and spacings are parameters (count2 edit,
 //! spacing2 edit, refusal of an overlapping spacing); undo; save/reopen as
 //! format v8; a one-row pattern stays format-identical to before.

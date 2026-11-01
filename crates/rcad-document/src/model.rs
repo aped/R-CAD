@@ -410,7 +410,7 @@ pub enum FeatureKind {
         spacing: f64,
         direction: [f64; 2],
         /// A second direction (format v8): a rectangular `count` x
-        /// `second.count` grid, as Fusion's rectangular pattern. Instance
+        /// `second.count` grid (a rectangular pattern). Instance
         /// number `i + j·MAX_PATTERN_COUNT` (stable when either count changes)
         /// sits at `i·spacing` along `direction` and
         /// `j·second.spacing` along `second.direction`; the seed is (0, 0).
@@ -2438,7 +2438,7 @@ impl Document {
     /// After a user parameter's expression changed to `expression`: when
     /// the active configuration sets that parameter, store the new
     /// expression in its row too, so switching configurations does not
-    /// silently revert the edit (as Fusion edits the active configuration).
+    /// silently revert the edit (the active configuration is the one edited).
     /// Returns the configuration written to.
     pub fn write_back_configuration(&mut self, name: &str, expression: &str) -> Option<String> {
         let active = self.active_configuration.clone()?;

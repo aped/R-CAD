@@ -1,4 +1,5 @@
-//! Application bar and ribbon: SOLID groups in Fusion order with promoted
+//! Application bar and ribbon: SOLID groups in order (Create, Modify, ...,
+//! Select) with promoted
 //! icon buttons (accessible name = command label), every former
 //! inspector-only action reachable from the ribbon with an enabled rule that
 //! follows the selection, the contextual SKETCH tab with FINISH SKETCH, the
@@ -76,7 +77,7 @@ fn plate(h: &mut Harness<'_, RcadApp>) -> u32 {
 }
 
 #[test]
-fn solid_tab_groups_are_in_fusion_order() {
+fn solid_tab_groups_run_create_to_select() {
     assert_eq!(
         registry::groups(Tab::Solid),
         [

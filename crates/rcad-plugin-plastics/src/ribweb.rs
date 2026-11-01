@@ -16,7 +16,7 @@
 //! Lines meeting at an end are each extended by half the thickness there,
 //! so corners are filled. Arcs are exact annular-sector prisms (not drafted;
 //! a drafted arc wall would be a cone section); circles are refused. Not supported: fillets, extending free
-//! ends to the next face (Fusion's Extend Curves).
+//! ends to the next face (extending curves).
 use crate::util::SINK;
 use crate::util::{EPS, invalid, prism, unsupported};
 use crate::{choice, input, param};

@@ -131,7 +131,7 @@ fn sketch_geom(id: FeatureId, sketch: FeatureId, st: &Snapshot) -> Result<rp::Sk
         }
     }
     // Standalone points (no entity uses them), not the sketch origin: the
-    // placement points of point-based features (Fusion's sketch points).
+    // placement points of point-based features (sketch points).
     let points = s
         .points
         .iter()

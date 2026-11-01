@@ -1,7 +1,7 @@
 //! Plastic part design (docs/PLASTICS.md): the first R-CAD plugin and the
-//! reference for writing others. Features follow Autodesk Fusion's Plastic
-//! tab (Boss, Rib, Web, Snap Fit, Lip, Rest, plastic rules, Design Advice) as
-//! the behavioural reference; every feature is built from checked prism
+//! reference for writing others. Features cover the usual plastic-part
+//! tools (Boss, Rib, Web, Snap Fit, Lip, Rest, plastic rules, Design Advice);
+//! every feature is built from checked prism
 //! operations ([`rcad_plugin::Op::Prism`]), and what that cannot express
 //! exactly is refused or documented as a deviation, never approximated.
 pub mod advice;

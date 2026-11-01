@@ -1,7 +1,6 @@
 # From a blank document to a drawing and exports through real pointer/keyboard
 # input: a dimensioned 60 x 40 rectangle extruded 10 mm; a slot sketched across
-# the whole part and cut through all, which leaves two separate bodies (as
-# Fusion does); one-step undo/redo of the cut; a drawing of one piece exported to
+# the whole part and cut through all, which leaves two separate bodies; one-step undo/redo of the cut; a drawing of one piece exported to
 # PDF and DXF; both pieces exported to one 3MF (separate objects); save, close,
 # reopen. Expected volumes: 60*40*10; each piece = its width * 40 * 10, the slot
 # x 28..32 (clicked on the sketch grid).

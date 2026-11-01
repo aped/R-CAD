@@ -51,9 +51,11 @@ impl Theme {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Prefs {
     pub version: u32,
-    #[serde(default)]
+    /// An unrecognised value (e.g. a layer name an older build wrote) loads
+    /// as the default layer; the other preferences are kept.
+    #[serde(default, deserialize_with = "default_if_unknown")]
     pub keymap: KeymapLayer,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "default_if_unknown")]
     pub theme: Theme,
     /// Width of the docked command-dialog area (points).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -68,12 +70,11 @@ pub struct Prefs {
     #[serde(default)]
     pub recent: Vec<PathBuf>,
     /// Sketch: a new sketch on a planar face starts with the face's edges
-    /// projected (as construction). Fusion's default: on.
+    /// projected (as construction). On by default.
     #[serde(default = "yes")]
     pub auto_project_face_edges: bool,
     /// Sketch: a dimension click on a model edge (no sketch geometry under
-    /// the cursor) projects that edge first, then dimensions it. Fusion's
-    /// "auto project edges on reference"; off by default here.
+    /// the cursor) projects that edge first, then dimensions it. Off by default.
     #[serde(default)]
     pub auto_project_on_reference: bool,
     /// Cloud documents: editing one asks the server for its edit lock and
@@ -91,11 +92,22 @@ fn yes() -> bool {
     true
 }
 
+/// Deserialize a field, falling back to its default when the stored value is
+/// not one this build recognises (instead of failing the whole file).
+fn default_if_unknown<'de, D, T>(d: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: serde::de::DeserializeOwned + Default,
+{
+    let v = serde_json::Value::deserialize(d)?;
+    Ok(T::deserialize(v).unwrap_or_default())
+}
+
 impl Default for Prefs {
     fn default() -> Self {
         Self {
             version: PREFS_VERSION,
-            keymap: KeymapLayer::Fusion,
+            keymap: KeymapLayer::Standard,
             theme: Theme::FollowOs,
             dialog_width: None,
             browser_width: None,
@@ -209,7 +221,7 @@ mod tests {
         assert!(why.unwrap().contains("invalid"));
         std::fs::write(&path, r#"{"version": 99, "keymap": "classic"}"#).unwrap();
         let (d, why) = Prefs::load(&path);
-        assert_eq!(d.keymap, KeymapLayer::Fusion);
+        assert_eq!(d.keymap, KeymapLayer::Standard);
         assert!(why.unwrap().contains("newer"));
         // A column width out of range falls back to the default.
         std::fs::write(
@@ -222,6 +234,32 @@ mod tests {
             (d.browser_width, d.inspector_width, why),
             (None, Some(250.0), None)
         );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn unknown_keymap_or_theme_loads_default_and_keeps_the_rest() {
+        let dir = std::env::temp_dir().join(format!("rcad-prefs-unknown-{}", std::process::id()));
+        let path = dir.join("r-cad").join("prefs.json");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(
+            &path,
+            r#"{"version": 1, "keymap": "some_retired_layer", "theme": 7,
+                "browser_width": 300, "recent": ["/d/a.rcad.json"],
+                "auto_project_face_edges": false, "cloud_version_on_save": true}"#,
+        )
+        .unwrap();
+        let (p, why) = Prefs::load(&path);
+        assert_eq!(why, None);
+        assert_eq!(p.keymap, KeymapLayer::Standard);
+        assert_eq!(p.theme, Theme::FollowOs);
+        assert_eq!(p.browser_width, Some(300.0));
+        assert_eq!(p.recent, vec![PathBuf::from("/d/a.rcad.json")]);
+        assert!(!p.auto_project_face_edges);
+        assert!(p.cloud_version_on_save);
+        // A known value still loads as itself.
+        std::fs::write(&path, r#"{"version": 1, "keymap": "classic"}"#).unwrap();
+        assert_eq!(Prefs::load(&path).0.keymap, KeymapLayer::Classic);
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

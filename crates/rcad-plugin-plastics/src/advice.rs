@@ -1,9 +1,8 @@
 //! Design Advice (docs/PLASTICS.md "Design advice"): wall thickness,
 //! thickness variation, draft, undercuts and knife edges of one body for a
 //! pull direction, from the exact face kinds plus a closed tessellation
-//! ([`rcad_plugin::BodyMesh`]). Read-only; the report is JSON. Autodesk
-//! Fusion's Design Advice is the behavioural reference (Thickness, Undercuts,
-//! Draft and Knife Edges tabs).
+//! ([`rcad_plugin::BodyMesh`]). Read-only; the report is JSON, in four
+//! sections: thickness, undercuts, draft and knife edges.
 //!
 //! # Inputs
 //!

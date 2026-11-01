@@ -1784,7 +1784,7 @@ impl RcadApp {
             Some(f) => format!("Edit {}", self.feature_name(f)),
             None => dlg.display_title(),
         };
-        // Docked at the right edge of the canvas, under the ribbon (Fusion's
+        // Docked at the right edge of the canvas, under the ribbon (the
         // command-dialog position); one dialog at a time.
         let screen = ctx.content_rect();
         let view = self.view_rect.unwrap_or(screen);
@@ -2578,7 +2578,7 @@ impl RcadApp {
             .default_width(520.0)
             .show(ctx, |ui| {
                 crate::form::row(ui, "Keyboard layer:", |ui| {
-                    for l in [KeymapLayer::Fusion, KeymapLayer::Classic] {
+                    for l in [KeymapLayer::Standard, KeymapLayer::Classic] {
                         if ui
                             .selectable_label(layer == l, l.label())
                             .named(&format!("Keymap {}", l.label()))

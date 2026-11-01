@@ -39,7 +39,7 @@ pub fn load_installed() -> (Vec<String>, Vec<String>) {
 /// `plugin_feature`: create a feature of a plugin. Parameters not given take
 /// their defaults; when the feature's body has a rule (`use_rules`, default
 /// true) parameters with a rule template are bound to the rule's
-/// parameters instead (Fusion: dialog fields default to rule expressions).
+/// parameters instead (dialog fields default to rule expressions).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PluginFeatureCmd {
     #[serde(default, skip_serializing_if = "Option::is_none")]

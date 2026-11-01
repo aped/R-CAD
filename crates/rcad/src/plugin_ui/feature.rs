@@ -9,7 +9,7 @@
 //!
 //! Rules: for a new feature, a field the user did not change is left out of
 //! the command, so when the feature's body has a rule the command binds that
-//! slot to the rule (Fusion's rule-driven defaults); the field shows the
+//! slot to the rule (rule-driven defaults); the field shows the
 //! rule template it will follow. Edit Feature reopens the dialog with the
 //! stored values (bound slots show their expression) and redefines the
 //! feature in place; expressions are kept unless a field now holds a number.

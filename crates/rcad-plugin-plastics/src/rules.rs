@@ -2,7 +2,7 @@
 //! values (wall thickness, draft, nominal radius, lip clearance and reveal)
 //! and design-advice limits, assigned to bodies.
 //!
-//! Like Fusion's rules, a rule becomes model parameters (`<Rule>_T`,
+//! A rule becomes model parameters (`<Rule>_T`,
 //! `<Rule>_DA`, ...) and features created on a body with a rule bind their
 //! slots to expressions over them (`ABS_T/2`), so editing the rule updates
 //! every bound feature. Rule fields are expressions over the rule's own
@@ -19,8 +19,8 @@ pub struct PlasticData {
     /// Body id → rule name.
     #[serde(default)]
     pub bodies: BTreeMap<u32, String>,
-    /// Assembly component id → rule name (Fusion assigns rules to
-    /// components); a body's own assignment wins over its component's.
+    /// Assembly component id → rule name (rules can be assigned
+    /// to components); a body's own assignment wins over its component's.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub components: BTreeMap<u32, String>,
 }

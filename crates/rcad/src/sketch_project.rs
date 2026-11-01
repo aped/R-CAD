@@ -16,7 +16,7 @@
 //! is in flight the session is `committing` (input and Finish wait).
 //!
 //! A new sketch on a planar face starts with that face's edges projected as
-//! construction geometry (Fusion's default), unless "Auto-project face edges"
+//! construction geometry (the default), unless "Auto-project face edges"
 //! is off.
 use crate::app::{RcadApp, SketchTarget};
 use eframe::egui;

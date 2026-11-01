@@ -1,4 +1,4 @@
-# keymap: fusion
+# keymap: standard
 # PLASTIC tab with real input: a 40 x 30 x 4 plate (ribbon sketch on XY,
 # R / D keys, E), the ABS preset added in Manage Plastic Rules and stored
 # (rule parameters ABS_T, ...), the rule assigned to the plate (material ABS),

@@ -1,4 +1,4 @@
-//! Draft (docs/PLASTICS.md "Draft"): Fusion's fixed-plane draft of existing
+//! Draft (docs/PLASTICS.md "Draft"): fixed-plane draft of existing
 //! faces. Each selected planar face is turned about its line on the fixed
 //! plane by `draft_deg` (relative to its current orientation), leaning in as
 //! it goes along the pull direction (away from the fixed face, into the

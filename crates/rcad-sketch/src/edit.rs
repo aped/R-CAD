@@ -243,7 +243,7 @@ impl Sketch {
     }
 
     /// Constraints making entities `a` and `b` mirror images about the line
-    /// `line` (Fusion's Symmetry on two like entities):
+    /// `line` (symmetry on two like entities):
     /// * two lines: their end points pairwise `Symmetric`, paired the way the
     ///   current geometry is closest to (an end shared by both lines is held
     ///   on the mirror line instead);

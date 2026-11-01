@@ -1,4 +1,4 @@
-# keymap: fusion
+# keymap: standard
 # Blank to part with real keys and clicks only: ribbon sketch on XY, R rectangle
 # dimensioned `w = 40` (a new user parameter) and `w/2`, E extrude, sketch on the
 # top cap (edges auto-projected), P two cap edges, a hole dimensioned to their
@@ -10,7 +10,7 @@ wait_idle
 clickw Planes
 clickw Sketch on XY
 wait_idle
-# Fusion R: 2-point rectangle from the origin.
+# Standard-layer R: 2-point rectangle from the origin.
 key r
 sclick 0.3 0.2
 smove 40 30

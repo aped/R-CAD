@@ -23,8 +23,8 @@ pub mod viewcube;
 pub use keymap::KeymapLayer;
 pub use registry::CmdId;
 
-/// A browser or inspector section a command asks to open (Fusion places
-/// these commands in the ribbon; their forms still live in the panels).
+/// A browser or inspector section a command asks to open (these
+/// commands are placed in the ribbon; their forms still live in the panels).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Focus {
     Parameters,

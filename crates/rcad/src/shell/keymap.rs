@@ -1,5 +1,5 @@
-//! Keyboard bindings. Two layers: `Fusion` (the default; Fusion-style keys
-//! such as E extrude, H hole, F fillet, M move, J joint, I measure) and
+//! Keyboard bindings. Two layers: `Standard` (the default; single-letter
+//! command keys such as E extrude, H hole, F fillet, M move, J joint, I measure) and
 //! `Classic` (R-CAD's earlier bindings, e.g. F fit and R centre rectangle).
 //! Model-mode bindings come from the command registry; the sketch layer is a
 //! separate table here. Shortcuts are ignored while a text field has focus.
@@ -14,22 +14,22 @@ use crate::sketch_edit::SketchTool;
 #[serde(rename_all = "snake_case")]
 pub enum KeymapLayer {
     #[default]
-    Fusion,
+    Standard,
     Classic,
 }
 
 impl KeymapLayer {
     pub fn label(self) -> &'static str {
         match self {
-            KeymapLayer::Fusion => "Fusion-style",
+            KeymapLayer::Standard => "Standard",
             KeymapLayer::Classic => "R-CAD classic",
         }
     }
-    /// `RCAD_KEYMAP=classic|fusion` (scripts and tests pin a layer).
+    /// `RCAD_KEYMAP=standard|classic` (scripts and tests pin a layer).
     pub fn from_env() -> Option<Self> {
         match std::env::var("RCAD_KEYMAP").ok()?.trim() {
             "classic" => Some(KeymapLayer::Classic),
-            "fusion" => Some(KeymapLayer::Fusion),
+            "standard" => Some(KeymapLayer::Standard),
             _ => None,
         }
     }
@@ -125,8 +125,8 @@ pub fn sketch_bindings(layer: KeymapLayer) -> Vec<(Chord, SketchKey)> {
         (cmd(Key::Z), S::Undo),
     ];
     match layer {
-        KeymapLayer::Fusion => v.extend([
-            // Fusion: R is the 2-point rectangle; Shift+R (R-CAD) the centre one.
+        KeymapLayer::Standard => v.extend([
+            // Standard: R is the 2-point rectangle; Shift+R (R-CAD) the centre one.
             (shift(Key::R), S::Tool(T::CenterRectangle)),
             (k(Key::R), S::Tool(T::CornerRectangle)),
         ]),

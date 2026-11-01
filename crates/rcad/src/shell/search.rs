@@ -1,4 +1,4 @@
-//! Command search (S in the Fusion-style layer): a popup over the command
+//! Command search (S in the standard key layer): a popup over the command
 //! registry. Every typed word must occur in a command's label, tooltip or
 //! placement; the list shows each command's key and ribbon place, disabled
 //! commands keep their reason on hover. Enter runs the first enabled match,
