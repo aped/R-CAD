@@ -5,12 +5,12 @@
 //! add-in command model.
 //!
 //! Every test is skipped, with a note on standard error, when `python3` is not installed.
+mod common;
+
 use serde_json::Value;
 use std::f64::consts::PI;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
-
-const BIN: &str = env!("CARGO_BIN_EXE_rcad-cli");
 
 fn repo() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -28,7 +28,7 @@ fn have_python() -> bool {
 }
 
 fn cli(args: &[&Path]) -> Output {
-    Command::new(BIN)
+    Command::new(common::rcad_cli())
         .args(args)
         .env("XDG_DATA_HOME", tmp_data())
         .env_remove("RCAD_PLUGIN_PATH")

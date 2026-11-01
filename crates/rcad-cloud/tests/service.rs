@@ -544,7 +544,14 @@ fn open_document_downloads_then_uses_the_cache_offline() {
                 from_cache: false,
             },
         ] => {
-            assert!(path.starts_with(h.cache_root()), "{path:?}");
+            // Canonical on both sides: macOS temp dirs resolve through
+            // /private, Windows paths gain the \\?\ prefix.
+            assert!(
+                std::fs::canonicalize(path)
+                    .unwrap()
+                    .starts_with(std::fs::canonicalize(h.cache_root()).unwrap()),
+                "{path:?}"
+            );
             assert_eq!(link.base_version, 1);
             assert_eq!(link.org, fake_server::ORG);
             path.clone()

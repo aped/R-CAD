@@ -1,4 +1,5 @@
 //! `rcad-cli cloud` exit codes and output against the in-memory fake server (127.0.0.1 only).
+mod common;
 #[path = "../../rcad-cloud/tests/fake_server/mod.rs"]
 mod fake_server;
 
@@ -25,7 +26,7 @@ impl Env {
 
     /// `rcad-cli ARGS` (no `cloud` added) with this environment's directories.
     fn command(&self, args: &[&str]) -> Command {
-        let mut c = Command::new(env!("CARGO_BIN_EXE_rcad-cli"));
+        let mut c = Command::new(common::rcad_cli());
         c.args(args)
             .env("HOME", self.dir.path())
             .env("XDG_CONFIG_HOME", self.dir.path().join("config"))
@@ -739,7 +740,7 @@ fn concurrent_cli_processes_queue_every_save() {
         .flat_map(|r| files.iter().map(move |f| (r, f.clone())))
         .map(|(r, f)| {
             std::fs::write(&f, format!("round {r} {}", f.display())).unwrap();
-            Command::new(env!("CARGO_BIN_EXE_rcad-cli"))
+            Command::new(common::rcad_cli())
                 .args(["cloud", "save", f.to_str().unwrap(), "-m"])
                 .arg(format!("round {r}"))
                 .env("HOME", env.dir.path())
@@ -848,7 +849,7 @@ fn login_sso_prints_the_address_and_waits_for_the_browser() {
     let server = FakeServer::start();
     server.state.lock().unwrap().info.oidc = Some(fake_server::oidc_info());
     let env = Env::new();
-    let mut child = Command::new(env!("CARGO_BIN_EXE_rcad-cli"))
+    let mut child = Command::new(common::rcad_cli())
         .args(["cloud", "login", "--sso", &server.url, "--no-browser"])
         .env("HOME", env.dir.path())
         .env("XDG_CONFIG_HOME", env.dir.path().join("config"))
