@@ -156,7 +156,7 @@ CDLA-Permissive-2.0) is off.
 
 Transitive crates new to the build on the shipped targets: ureq-proto 0.6.4, http 1.5.0,
 httparse 1.10.1, base64 0.23.1, utf8-zero 0.8.1, rustls-pki-types 1.15.1 (MIT OR Apache-2.0);
-rustls-webpki 0.103.15 and untrusted 0.9.0 (ISC); ring 0.17.14 (Apache-2.0 AND ISC); subtle
+rustls-webpki 0.103.16 and untrusted 0.9.0 (ISC); ring 0.17.14 (Apache-2.0 AND ISC); subtle
 2.6.1 (BSD-3-Clause); zeroize 1.9.1 (Apache-2.0 OR MIT); rustls-platform-verifier 0.7.1 (MIT OR
 Apache-2.0) with rustls-native-certs 0.8.5 and openssl-probe 0.2.1 on Linux (certificate paths
 only; OpenSSL is not linked), security-framework 3.7.0 on macOS and schannel 0.1.30 (MIT) on
