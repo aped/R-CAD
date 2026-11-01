@@ -526,6 +526,82 @@ pub(super) fn eval_plugin(
             }
             continue;
         }
+        if let rp::Op::GussetBoss {
+            id: op_id,
+            body,
+            frame,
+            diameter,
+            height,
+            draft_deg,
+            rib_angles_deg,
+            rib_thickness,
+            rib_length,
+            rib_chamfer,
+            rib_height,
+            rib_tip_height,
+            label,
+        } = op
+        {
+            let target =
+                BodyId(rp::target_body(&req, body).ok_or_else(|| {
+                    DocError::Validation(format!("{id}: {label}: no target body"))
+                })?);
+            let t = brep_target(st, id, target)?;
+            let frame = from_plugin_frame(frame);
+            let spec = k::GussetBoss {
+                base_diameter: *diameter,
+                height: *height,
+                draft: draft_deg.to_radians(),
+                angles: rib_angles_deg.iter().map(|a| a.to_radians()).collect(),
+                thickness: *rib_thickness,
+                length: *rib_length,
+                chamfer: *rib_chamfer,
+                rib_height: *rib_height,
+                tip_height: *rib_tip_height,
+            };
+            let out = k::gusset_boss(&t, &frame, &spec).map_err(|e| match e {
+                k::KernelError::InvalidInput(m) => {
+                    DocError::ProductLimit(format!("{id}: {label}: {m}"))
+                }
+                other => DocError::Kernel {
+                    feature: id,
+                    detail: format!("{label}: {other}"),
+                },
+            })?;
+            replace_body(st, id, target, out);
+            if r.body.is_none() {
+                r.body = Some(target);
+            }
+            // The shank's faces resolve like a joined prism's: the circle of
+            // the diameter from the base, up the height, with the draft.
+            tools.push((
+                *op_id,
+                ExtrudeOut {
+                    start: frame,
+                    distance: *height,
+                    dir: 1.0,
+                    extent: Extent::Distance,
+                    profile: SketchProfile::Circle {
+                        center: [0.0, 0.0],
+                        radius: diameter / 2.0,
+                    },
+                    entities: vec![EntityId(0)],
+                    holes: vec![],
+                    span: (0.0, *height),
+                    nominal: (0.0, *height),
+                    side: Some(1.0),
+                    removes: false,
+                    joined: true,
+                    intersect: false,
+                    plain: *draft_deg == 0.0,
+                    multi: false,
+                    taper: draft_deg.to_radians(),
+                    pieces: false,
+                    body: target,
+                },
+            ));
+            continue;
+        }
         if let rp::Op::Countersink {
             body,
             at,

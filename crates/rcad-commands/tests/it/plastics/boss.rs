@@ -407,19 +407,109 @@ fn a_root_fillet_ring_follows_pappus() {
     assert_eq!(pr, [Some(true), Some(false)]);
 }
 
+/// One gusset's volume outside a shank of radius `r0 - z tan(a)`: across
+/// the thickness (Simpson over y), the side outline's area (flat top `h0`
+/// out to `l - ch`, a straight chamfer down to `h1` at `l`) less the part
+/// inside the shank, whose integral in z is closed-form:
+/// ∫ sqrt(u² − y²) du = u sqrt(u² − y²)/2 − y² ln(u + sqrt(u² − y²))/2.
+fn drafted_rib_outside(r0: f64, a: f64, t: f64, l: f64, ch: f64, h0: f64, h1: f64) -> f64 {
+    let ta = a.tan();
+    let g = |u: f64, y: f64| {
+        let q = (u * u - y * y).sqrt();
+        u * q / 2.0 - y * y * (u + q).ln() / 2.0
+    };
+    let outline = l * h0 - ch * (h0 - h1) / 2.0;
+    let side = |y: f64| outline - (g(r0, y) - g(r0 - h0 * ta, y)) / ta;
+    let n = 2000;
+    let dy = t / n as f64;
+    let mut acc = side(-t / 2.0) + side(t / 2.0);
+    for i in 1..n {
+        acc += if i % 2 == 1 { 4.0 } else { 2.0 } * side(-t / 2.0 + i as f64 * dy);
+    }
+    acc * dy / 3.0
+}
+
 #[test]
-fn ribs_on_a_drafted_shank_are_refused_by_name() {
+fn gussets_on_a_drafted_shank_meet_the_cone_exactly() {
     let (mut s, _, sk) = setup();
+    let before = vol(&s, BodyId(1));
+    let params = |draft: f64| {
+        vec![
+            ("height", 8.0),
+            ("draft_deg", draft),
+            ("rib_count", 4.0),
+            ("rib_thickness", 1.2),
+            ("rib_length", 7.0),
+            ("rib_height", 6.0),
+            ("rib_tip_height", 2.0),
+            ("rib_angle_deg", 45.0),
+        ]
+    };
+    let want = |draft: f64| {
+        let a = f64::to_radians(draft);
+        let shank = frustum(3.0, 3.0 - 8.0 * a.tan(), 8.0);
+        let rib = drafted_rib_outside(3.0, a, 1.2, 7.0, 3.0, 6.0, 2.0);
+        PLATE + 2.0 * (shank + 4.0 * rib - PI * 1.25f64.powi(2) * 6.0)
+    };
+    // Ribs reaching the shank top, and fillets with the gussets: refused,
+    // the document unchanged.
+    let mut p = params(2.0);
+    p[5].1 = 8.0;
     let m = err(
         &mut s,
-        feature(
-            "boss",
-            &[("sketch", sketch_in(sk))],
-            &[("draft_deg", 1.0), ("rib_count", 4.0)],
-            &[],
-        ),
+        feature("boss", &[("sketch", sketch_in(sk))], &p, &[]),
     );
-    assert!(m.contains("drafted shank"), "{m}");
+    assert!(m.contains("below its top"), "{m}");
+    let mut p = params(2.0);
+    p.push(("root_radius", 1.0));
+    let m = err(
+        &mut s,
+        feature("boss", &[("sketch", sketch_in(sk))], &p, &[]),
+    );
+    assert!(m.contains("drafted shank with gussets"), "{m}");
+    assert_close(vol(&s, BodyId(1)), before, 1e-12, "unchanged");
+    let r = ok(
+        &mut s,
+        feature("boss", &[("sketch", sketch_in(sk))], &params(2.0), &[]),
+    );
+    assert_close(vol(&s, BodyId(1)), want(2.0), 1e-6, "volume");
+    // Rib at 45°: under its flat top, above its chamfer, under the chamfer;
+    // between ribs (0°) beside the shank.
+    let d = std::f64::consts::FRAC_1_SQRT_2;
+    let at = |x: f64, z: f64| [-15.0 + x * d, x * d, z];
+    let pr = probe(
+        &s,
+        BodyId(1),
+        &[
+            at(4.0, 7.0),
+            at(6.5, 7.0),
+            at(6.5, 6.0),
+            [-15.0 + 4.0, 0.0, 7.0],
+        ],
+    );
+    assert_eq!(pr, [Some(true), Some(false), Some(true), Some(false)]);
+    // Regenerates after an upstream edit of the draft; undo restores.
+    let f = r.feature.unwrap();
+    ok(
+        &mut s,
+        Command::SetParameter {
+            feature: f,
+            name: "draft_deg".into(),
+            value: 3.0,
+        },
+    );
+    assert_close(vol(&s, BodyId(1)), want(3.0), 1e-6, "draft 3°");
+    ok(&mut s, Command::Undo);
+    assert_close(vol(&s, BodyId(1)), want(2.0), 1e-6, "undone");
+    // The cone/plane edges are exact: the body exports to STEP.
+    let dir = tempfile::tempdir().unwrap();
+    ok(
+        &mut s,
+        Command::ExportStep {
+            path: dir.path().join("boss.step"),
+            bodies: None,
+        },
+    );
 }
 
 #[test]

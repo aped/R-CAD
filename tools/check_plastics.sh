@@ -4,7 +4,8 @@
 # Builds cases with the release rcad-cli (RCAD_CLI overrides the binary), exports each body to
 # STEP and checks with FreeCAD: exactly one valid solid, and its volume
 #   - against a closed form computed here (bosses with gussets, a drafted rest, a lip and its
-#     groove, a snap-fit groove, root fillets along an arc), to 5e-5 relative: OpenCascade's integration of our exports
+#     groove, a snap-fit groove, root fillets along an arc, gussets on a drafted
+#     boss), to 5e-5 relative: OpenCascade's integration of our exports
 #     differs by up to ~1e-5 relative (no pcurves on planar faces, see tools/check_revolved.sh);
 #     the command tests assert the exact volumes to 1e-6;
 #   - for the full plastic enclosure example (no closed form), against R-CAD's own volume to
@@ -132,6 +133,24 @@ cases["arc_web_root"] = (open_box + [arc_sketch,
     pf("web", {"sketch": sk(4)}, {"thickness": 2.0, "draft_deg": 0.0, "fillet_radius": f},
        {"direction": "flip", "extent": "to_next"})],
     {1: BOX + math.pi / 2 * (11 ** 2 - 9 ** 2) * 18 + math.pi * f * f * (1 - math.pi / 4) * ((11 + d1) + (9 - d1))})
+# M. The bosses of A on a 2 deg drafted shank: gussets meet the cone in exact hyperbolas. Each rib
+# outside the shank: across the thickness, the side outline less the part inside the cone, whose
+# z integral is closed-form (int sqrt(u^2 - y^2) du).
+def drafted_rib(r0, a, t, l, ch, h0, h1, n=20000):
+    ta = math.tan(a)
+    g = lambda u, y: u * math.sqrt(u * u - y * y) / 2 - y * y * math.log(u + math.sqrt(u * u - y * y)) / 2
+    side = lambda y: l * h0 - ch * (h0 - h1) / 2 - (g(r0, y) - g(r0 - h0 * ta, y)) / ta
+    dy = t / n
+    acc = side(-t / 2) + side(t / 2) + sum((4 if i % 2 else 2) * side(-t / 2 + i * dy) for i in range(1, n))
+    return acc * dy / 3
+a2 = math.radians(2)
+r_top = 3 - 8 * math.tan(a2)
+cases["boss_ribs_drafted"] = ([{"cmd": "new_document"}, rect("WorldXY", 60.0, 40.0), {"cmd": "extrude", "sketch": 1, "distance": 4.0},
+    pts({"Face": face(2, "ExtrudeEndCap")}, [(-15.0, 0.0), (15.0, 0.0)]),
+    pf("boss", {"sketch": sk(3)}, {"height": 8.0, "draft_deg": 2.0, "rib_count": 4, "rib_thickness": 1.2,
+       "rib_length": 7.0, "rib_height": 6.0, "rib_tip_height": 2.0, "rib_angle_deg": 45.0})],
+    {1: 9600 + 2 * (math.pi * 8 / 3 * (9 + 3 * r_top + r_top ** 2) + 4 * drafted_rib(3, a2, 1.2, 7, 3, 6, 2)
+                    - math.pi * 1.25 ** 2 * 6)})
 # E. The plastic enclosure example (no closed form: cross-check against R-CAD's volumes).
 ex = json.load(open(f"{repo}/examples/plastic_enclosure_workflow.json"))
 ex = [c for c in ex if c["cmd"] != "save"]

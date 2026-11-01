@@ -278,6 +278,34 @@ pub enum Op {
         #[serde(default)]
         label: String,
     },
+    /// Exact round boss with planar gusset ribs on the body of input
+    /// `body`, standing on its planar face through `frame.origin` facing
+    /// along `frame.z`: a shank of `diameter` at its base up `height`,
+    /// narrowing by `draft_deg`, and gussets `rib_thickness` thick at
+    /// `rib_angles_deg` (from `frame.x` towards `frame.y`), reaching
+    /// `rib_length` from the axis, with a flat top at `rib_height`
+    /// chamfered over the last `rib_chamfer` down to `rib_tip_height`. Built
+    /// into the topology by the kernel (no boolean; exact cone/plane edges),
+    /// checked by probes and volume. The shank's faces are referenced like
+    /// those of a prism of the same id (circle of `diameter`, `height`).
+    GussetBoss {
+        id: u32,
+        body: String,
+        frame: Frame,
+        diameter: f64,
+        height: f64,
+        #[serde(default)]
+        draft_deg: f64,
+        rib_angles_deg: Vec<f64>,
+        rib_thickness: f64,
+        rib_length: f64,
+        #[serde(default)]
+        rib_chamfer: f64,
+        rib_height: f64,
+        rib_tip_height: f64,
+        #[serde(default)]
+        label: String,
+    },
     /// Exact countersink (cone of `diameter` at the entry, included angle
     /// `angle_deg`) of the round hole of `hole_diameter` on the axis through
     /// `at` along `axis`, entering from the planar face through `at`
@@ -714,6 +742,65 @@ pub fn check_ops(req: &BuildRequest, ops: &[Op]) -> Result<(), PluginError> {
             if let Err(m) = profile.to_sketch() {
                 return bad(&m);
             }
+            continue;
+        }
+        if let Op::GussetBoss {
+            id,
+            body,
+            frame,
+            diameter,
+            height,
+            draft_deg,
+            rib_angles_deg,
+            rib_thickness,
+            rib_length,
+            rib_chamfer,
+            rib_height,
+            rib_tip_height,
+            label,
+        } = op
+        {
+            let what = format!(
+                "{}: {}",
+                req.feature,
+                if label.is_empty() {
+                    "gusseted boss"
+                } else {
+                    label
+                }
+            );
+            let bad = |m: &str| Err(PluginError::Failed(format!("{what}: {m}")));
+            if !ids.insert(*id) {
+                return bad("operation id repeated");
+            }
+            if target_body(req, body).is_none() {
+                return bad(&format!(
+                    "'{body}' is not a face, body or sketch-on-face input"
+                ));
+            }
+            let nums = [
+                *diameter,
+                *height,
+                *draft_deg,
+                *rib_thickness,
+                *rib_length,
+                *rib_chamfer,
+                *rib_height,
+                *rib_tip_height,
+            ];
+            if !frame.is_finite()
+                || !nums.iter().chain(rib_angles_deg).all(|v| v.is_finite())
+                || rib_angles_deg.is_empty()
+                || rib_angles_deg.len() > 64
+                || !(*diameter > 0.0 && *height > 0.0 && *rib_thickness > 0.0)
+            {
+                return bad(
+                    "needs a finite frame, 1 to 64 rib angles and positive diameter, height and \
+                     thickness",
+                );
+            }
+            // Its shank is referenced like a prism of the same id.
+            prisms.insert(*id);
             continue;
         }
         if let Op::Countersink {
