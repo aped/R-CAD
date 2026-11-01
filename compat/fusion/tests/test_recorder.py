@@ -304,6 +304,19 @@ class Features(unittest.TestCase):
         self.assertEqual(web["choices"]["extent"], "to_next")
         self.assertEqual(web["inputs"]["sketch"]["sketch"], 3)
 
+    def test_rib_and_web_root_fillets(self):
+        design, root = fresh()
+        _, ext = block(root)
+        body = ext.bodies.item(0)
+        sk = root.sketches.add(root.xZConstructionPlane)
+        sk.sketchCurves.sketchLines.addByTwoPoints(P.create(0, 0.5, 0), P.create(2, 0.5, 0))
+        wi = root.features.webFeatures.createInput(sk, V.createByString("1 mm"), body)
+        wi.filletRadius = V.createByString("0.5 mm")
+        wi.setToNextExtent()
+        root.features.webFeatures.add(wi)
+        (web,) = [c for c in commands() if c["cmd"] == "plugin_feature"]
+        self.assertEqual(web["params"]["fillet_radius"], 0.5)
+
     def test_rules_are_assigned_to_the_component_bodies(self):
         design, root = fresh()
         rule = design.designPlasticRules.addByCopy(design.libraryPlasticRules.itemByName("ABS"), "Case")

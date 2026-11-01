@@ -1570,6 +1570,7 @@ class RibFeatureInput(Base):
         self._draft = None
         self._flipped = False
         self._symmetric = True
+        self._fillet = None
 
     def _member(self):
         return "WebFeatureInput" if self._web else "RibFeatureInput"
@@ -1636,12 +1637,11 @@ class RibFeatureInput(Base):
 
     @property
     def filletRadius(self):
-        return None
+        return self._fillet
 
     @filletRadius.setter
     def filletRadius(self, value):
-        if _rec().number(value, LENGTH, "filletRadius") != 0:
-            raise NotSupported("adsk.fusion.%s.filletRadius is not modelled (only 0)" % self._member())
+        self._fillet = value
 
     @property
     def targetBody(self):
@@ -1703,6 +1703,7 @@ class RibFeatures(Collection):
             ("thickness", input._thickness, LENGTH),
             ("depth", input._depth, LENGTH),
             ("draft_deg", input._draft, ANGLE),
+            ("fillet_radius", input._fillet, LENGTH),
         ):
             if vi is None:
                 continue

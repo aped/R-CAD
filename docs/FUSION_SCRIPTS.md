@@ -129,8 +129,8 @@ exist on every object; collections have `count`, `item(i)` and iteration.
 | `.rootRadius` | `root_radius` (exact concave root fillet; 0 when not set) |
 | `.alignmentType` (`BossAlignFlat`, `BossAlignStepOut`, `BossAlignStepIn`), `.alignmentDiameter`, `.alignmentDepth` | `step` (none/out/in), `step_diameter`, `step_depth` |
 | `.holeStartRadius`, `.holeEndRadius`, `.ribRootRadius`, `.ribTipRadius`, `.ribDraftAngle`, `.ribOuterDraftAngle` | accepted only as 0 (not modelled). Every boss is recorded with `root_radius` 0, so the rule's `NR` does not add a root fillet |
-| `ribFeatures.createInput(curves, thickness, targetBody)`, `RibFeatureInput.setDistanceExtent(depth)`, `.setToNextExtent()`, `.thickness`, `.draftAngle`, `.isFlipped`, `.isSymmetric`, `.targetBody`; `ribFeatures.add` | `plugin_feature` `rib`: `thickness`, `depth`, `draft_deg`; side `right` (the curve direction × the sketch normal) or `left` when flipped; `thickness_side` `symmetric` / `one_side`; `extent` `distance` / `to_next` |
-| `webFeatures.createInput(curves, thickness, targetBody)`, `WebFeatureInput.setDistanceExtent(depth)`, `.setToNextExtent()`, `.thickness`, `.draftAngle`, `.isFlipped`, `.isSymmetric`, `.targetBody`; `webFeatures.add` | `plugin_feature` `web`: as the rib, with `direction` `normal` / `flip` and `extent` `distance` / `to_next` |
+| `ribFeatures.createInput(curves, thickness, targetBody)`, `RibFeatureInput.setDistanceExtent(depth)`, `.setToNextExtent()`, `.thickness`, `.draftAngle`, `.filletRadius`, `.isFlipped`, `.isSymmetric`, `.targetBody`; `ribFeatures.add` | `plugin_feature` `rib`: `thickness`, `depth`, `draft_deg`, `fillet_radius` (root fillets, to-next only); side `right` (the curve direction × the sketch normal) or `left` when flipped; `thickness_side` `symmetric` / `one_side`; `extent` `distance` / `to_next` |
+| `webFeatures.createInput(curves, thickness, targetBody)`, `WebFeatureInput.setDistanceExtent(depth)`, `.setToNextExtent()`, `.thickness`, `.draftAngle`, `.filletRadius`, `.isFlipped`, `.isSymmetric`, `.targetBody`; `webFeatures.add` | `plugin_feature` `web`: as the rib, with `direction` `normal` / `flip` and `extent` `distance` / `to_next` |
 
 `curves` is a list or `ObjectCollection` of sketch lines from one sketch, or a `Sketch` (all of
 its curves). A subset of a sketch's lines gets a selection sketch, as for bosses.
@@ -184,7 +184,7 @@ was stored keep their plain values.
   chamfer angle, and `isDefaultDirection = False`. The boss offset is a plain value (not bound to
   a parameter).
 - **Rib and web:** ribs and webs take a distance or to-next. `isThicknessFromTop`, `isExtended` (extend
-  curves), fillet radii other than 0 and `draftPullDirection` are not mapped. Only straight
+  curves) and `draftPullDirection` are not mapped. Only straight
   lines are accepted.
 - **Plastic rules:** `thicknessVariation` is not mapped: R-CAD's `TV` is a ratio. Library rules
   cannot be edited or added to. There is no per-component rule other than the root's.
@@ -369,4 +369,22 @@ rcad-cli run box.json        # the same model from the recorded commands
   selections, relative imports and unsupported members.
 
 These tests check R-CAD's mapping against the public API reference. They are not a comparison
-with Fusion: no script has been run in Fusion for these results.
+with Fusion.
+
+## Comparing with Fusion
+
+`tools/fusion_reference/` holds reference cases: Fusion API scripts that both modellers run.
+
+1. In Fusion: **Utilities > Scripts and Add-Ins**, add the folder
+   `tools/fusion_reference/RcadReference` and run it. It builds every case in a new design and
+   writes Fusion's measurements of each body (volume, centre of mass, bounding box, face
+   count) to `fusion_results.json` in that folder.
+2. Here: `tools/fusion_reference/compare.py` (after `cargo build --release -p rcad-cli`, or
+   with `RCAD_CLI` set). It runs each case with `rcad-cli fusion-script` and compares volumes
+   (1e-5 relative) and centres of mass (1e-3 mm), with bounding boxes as advisory. Cases with
+   a closed form also check R-CAD against it first. It exits with 2 and says
+   `Fusion comparison NOT RUN` while there are no Fusion results.
+
+The cases are plain bosses, bosses with tip fillets, drafted bosses with root fillets, a web
+with root fillets in an open box, and the two examples above. No Fusion results are
+committed: the comparison has not been run against Fusion yet.
