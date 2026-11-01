@@ -40,22 +40,45 @@ A build is deterministic and has no access to the document beyond its request.
 
 ### Operations
 
-Four kinds:
+Nine kinds:
 
 ```text
 Prism       { id, body, frame, profile, holes, from, to, taper_deg, mode, label }
+Revolve     { id, body, frame, profile, angle_deg, mode, label }
 EdgeLoop    { id, of, end, blend: fillet|chamfer, size, holes, label }
+EdgeFillet  { id, body, a, b, radius, label }
+RootRound   { id, body, at, axis, boss_diameter, radius, draft_deg, label }
+GussetBoss  { id, body, frame, diameter, height, draft_deg, rib_angles_deg, rib_thickness,
+              rib_length, rib_chamfer, rib_height, rib_tip_height, label }
+DraftFaces  { id, body, faces, plane_point, plane_normal, pull, angle_deg, two_sided,
+              parting, parting_across, label }
 ReplaceFace { id, face, index, origin, normal, label }
 Countersink { id, body, at, axis, hole_diameter, diameter, angle_deg, label }
 ```
 
+- `Revolve` turns a profile (frame plane coordinates, all at `x >= 0`) by `angle_deg` about the
+  frame's Y axis, joined or cut through the kernel's checked combine (exact revolved booleans
+  with an independent membership check).
 - `EdgeLoop` rounds or bevels the outer edge loop (with `holes`, also the inner loops) of the end
   or start cap of earlier prism `of`. This is the kernel's exact cap-loop blend
   (docs/FILLETS.md), which checks its result against the closed-form removed volume. Where
   several faces lie in the cap's plane, the one holding the cap frame's origin is blended.
+- `EdgeFillet` rounds the straight edge where the faces in planes `a` and `b` (a point and the
+  outward unit normal each) meet: the kernel's edge fillet, convex or concave, on a body
+  prismatic along the edge. Used for root fillets of straight ribs, webs and hooks.
+- `RootRound` is the concave root fillet where a round wall meets the planar face through `at`
+  perpendicular to `axis`, built into the topology as torus bands: a whole boss (cylinder, or
+  a cone with `draft_deg`), or, with no draft, an open run of a cylinder ending in radial end
+  faces with material on either side (the walls of a web along an arc).
+- `GussetBoss` builds a round shank (drafted by `draft_deg`) with gussets at
+  `rib_angles_deg` directly into the body, on the planar face holding the frame's origin;
+  gusset sides meet the cone in exact conics. Used for drafted bosses with ribs.
+- `DraftFaces` tilts planar faces (each named by a point and outward normal) by `angle_deg`
+  about their hinge on the fixed plane, along `pull`; `two_sided` drafts both sides of the
+  plane. With `parting` (a polyline of points) the hinge is the parting surface swept from it
+  along `parting_across`. Exact and polyhedral: vertices are solved as plane intersections.
 - `ReplaceFace` replaces a planar face of a `face`/`faces` input by another plane, keeping
   topology: the kernel's exact face replacement (ADR 0010 preconditions), checked by probes.
-  Used for drafts.
 - `Countersink` cones the entry of an existing round hole on the axis through `at`, from the
   planar face through `at`: the kernel's exact countersink, built into the topology.
 

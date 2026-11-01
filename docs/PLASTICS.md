@@ -108,7 +108,10 @@ sketch and facing it.
   chamfered over the last `rib_chamfer` down to `rib_tip_height` (Fusion's chamfer profile),
   spread evenly over the total angle. The chamfer must start outside the shank: the flat top
   then meets the shank in circle arcs and the gusset sides in straight lines, all exact edges, so
-  the body exports to STEP;
+  the body exports to STEP. On a drafted shank, the kernel builds the shank and its gussets
+  together, standing on the base face (no boolean): each gusset side meets the cone in an exact
+  hyperbola (a rational quadratic), its flat top meets it in a circle arc, and the cone is split
+  into panels over and between the gussets. The ribs must then end below the shank top;
 - the hole, cut last.
 
 With `mate`, the other body also gets:
@@ -120,8 +123,9 @@ With `mate`, the other body also gets:
 **Refused:**
 - a hole not narrower than the drafted top;
 - a pilot deeper than the material;
-- ribs on a drafted shank (the kernel cannot join planar ribs to a cone yet; use a straight
-  shank with ribs);
+- on a drafted shank: ribs reaching its top, neighbouring ribs meeting on it, ribs not
+  narrower than it at their top, tip and root fillets with ribs, and another feature within
+  the gussets' reach on the base face;
 - ribs on a base thinner than 0.4 mm;
 - a mate face that is not parallel and facing;
 - no room for the mating shank.
@@ -425,7 +429,7 @@ closed forms to 1e-6 relative, with point probes:
 - save and reload at v10, and a missing plugin.
 
 **Independent validation:** `tools/check_plastics.sh` exports to STEP:
-- bosses with gussets, with tip fillets and with root fillets;
+- bosses with gussets (also on a drafted shank), with tip fillets and with root fillets;
 - a drafted rest;
 - a lip and groove, also drafted;
 - a two-sided draft, and one about a broken (roof-shaped) parting line;

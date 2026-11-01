@@ -41,9 +41,10 @@ pub use combine::{
     verify_boolean_by_membership, verify_combine_by_membership,
 };
 pub use direct::{
-    CylinderFeature, DirectEdit, DirectFace, classify_face, classify_faces, countersink,
-    cylinder_feature, draft_faces, draft_faces_parting, offset_face, planar_face_area,
-    remove_cylinder, renumber, replace_face, resize_cylinder, root_round, tilt_offset_frame,
+    CylinderFeature, DirectEdit, DirectFace, GussetBoss, classify_face, classify_faces,
+    countersink, cylinder_feature, draft_faces, draft_faces_parting, gusset_boss, offset_face,
+    planar_face_area, remove_cylinder, renumber, replace_face, resize_cylinder, root_round,
+    tilt_offset_frame,
 };
 pub use edges::{
     DrawingEdge, EDGE_FIT_TOL, EdgeCurve, POLY_SAMPLES, SMOOTH_COS, drawing_edges, sharp_edges,

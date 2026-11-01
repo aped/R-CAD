@@ -33,8 +33,13 @@
 //!   (exact cap-loop blend; refused by the kernel where gussets reach the
 //!   top or the hole is within the radius of the edge).
 //!
-//! Not supported (refused or absent, stated): ribs on a drafted shank
-//! (cone/plane joins), drafted ribs, countersinks, a fastener component.
+//! With a drafted shank and ribs, parts 0 and 2.. are one kernel
+//! construction ([`Op::GussetBoss`]: the cone and the planar gussets meet
+//! in exact edges, no boolean); the ribs must then end below the shank top,
+//! and tip/root fillets are refused.
+//!
+//! Not supported (refused or absent, stated): drafted ribs, a fastener
+//! component.
 use crate::util::{EPS, SINK, invalid, placement_points, prism, standing, unsupported};
 use crate::{choice, input, param};
 use rcad_plugin::geom::{back_below_over, dot, footprint_of, next_below_over};
@@ -312,13 +317,20 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
     );
     if ribs > 0 {
         if da > 0.0 {
-            return Err(unsupported(
-                F,
-                "gusset ribs on a drafted shank are not supported (the kernel's join of planar \
-                 ribs to a cone is not reliable yet); set draft_deg to 0 or rib_count to 0",
-            ));
+            // The kernel builds the drafted shank and its gussets together.
+            if rh > h - EPS {
+                return Err(invalid(
+                    F,
+                    "on a drafted shank the ribs must end below its top (rib_height < height)",
+                ));
+            }
+            if p("tip_radius")? > 0.0 || p("root_radius")? > 0.0 {
+                return Err(unsupported(
+                    F,
+                    "tip and root fillets are not supported on a drafted shank with gussets",
+                ));
+            }
         }
-
         if rl <= d / 2.0 + EPS {
             return Err(invalid(
                 F,
@@ -363,7 +375,7 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
             )
         })?;
         let bottom = back_below_over(&s.parallel, base, EPS, &footprint_of(&[*pt], reach));
-        if ribs > 0 && !bottom.is_some_and(|b| base - b > 2.0 * SINK) {
+        if ribs > 0 && da == 0.0 && !bottom.is_some_and(|b| base - b > 2.0 * SINK) {
             return Err(unsupported(
                 F,
                 format!("ribs sink {SINK} mm into the base; the material under it is too thin"),
@@ -372,7 +384,36 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
         let top = base + h;
         let at = s.frame.at(*pt).offset(base);
         let lbl = |w: &str| format!("boss {}: {w}", i + 1);
-        {
+        let total = p("rib_total_deg")?.to_radians();
+        let step = if (total - std::f64::consts::TAU).abs() < 1e-9 {
+            total / ribs.max(1) as f64
+        } else if ribs > 1 {
+            total / (ribs - 1) as f64
+        } else {
+            0.0
+        };
+        let a0 = p("rib_angle_deg")?.to_radians();
+        if ribs > 0 && da > 0.0 {
+            // Drafted shank with gussets: one exact construction standing on
+            // the base face (cone/plane edges built directly, no boolean).
+            ops.push(Op::GussetBoss {
+                id,
+                body: "sketch".into(),
+                frame: at,
+                diameter: d,
+                height: h,
+                draft_deg: da.to_degrees(),
+                rib_angles_deg: (0..ribs)
+                    .map(|k| (a0 + step * k as f64).to_degrees())
+                    .collect(),
+                rib_thickness: rt,
+                rib_length: rl,
+                rib_chamfer: p("rib_chamfer")?,
+                rib_height: rh,
+                rib_tip_height: rtip,
+                label: lbl("shank and ribs"),
+            });
+        } else {
             ops.push(prism(
                 id,
                 "sketch",
@@ -385,16 +426,7 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
                 lbl("shank"),
             ));
         }
-        if ribs > 0 {
-            let total = p("rib_total_deg")?.to_radians();
-            let step = if (total - std::f64::consts::TAU).abs() < 1e-9 {
-                total / ribs as f64
-            } else if ribs > 1 {
-                total / (ribs - 1) as f64
-            } else {
-                0.0
-            };
-            let a0 = p("rib_angle_deg")?.to_radians();
+        if ribs > 0 && da == 0.0 {
             // Gussets start where neighbours no longer meet (inside the
             // shank, so nothing changes outside it): coplanar tops crossing
             // at the axis would defeat the booleans.

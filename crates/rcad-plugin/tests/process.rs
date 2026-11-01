@@ -410,7 +410,8 @@ fn example_vent_slots_plugin_handles_depth_single_slots_and_refusals() {
                 | Op::Revolve { id, .. }
                 | Op::RootRound { id, .. }
                 | Op::EdgeFillet { id, .. }
-                | Op::DraftFaces { id, .. } => *id,
+                | Op::DraftFaces { id, .. }
+                | Op::GussetBoss { id, .. } => *id,
             })
             .collect()
     };
