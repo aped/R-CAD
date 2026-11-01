@@ -532,6 +532,8 @@ pub fn build(req: &BuildRequest) -> Result<Vec<Op>, PluginError> {
             pull: f.frame.z,
             angle_deg: da,
             two_sided: false,
+            parting: Vec::new(),
+            parting_across: [0.0; 3],
             label: format!("{what} draft"),
         })
     };

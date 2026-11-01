@@ -324,6 +324,8 @@ pub(super) fn eval_plugin(
             pull,
             angle_deg,
             two_sided,
+            parting,
+            parting_across,
             label,
             ..
         } = op
@@ -361,15 +363,27 @@ pub(super) fn eval_plugin(
                 };
                 idx.push(*fi);
             }
-            let out = k::draft_faces(
-                &t,
-                &idx,
-                *plane_point,
-                *plane_normal,
-                *pull,
-                angle_deg.to_radians(),
-                *two_sided,
-            )
+            let out = if parting.is_empty() {
+                k::draft_faces(
+                    &t,
+                    &idx,
+                    *plane_point,
+                    *plane_normal,
+                    *pull,
+                    angle_deg.to_radians(),
+                    *two_sided,
+                )
+            } else {
+                k::draft_faces_parting(
+                    &t,
+                    &idx,
+                    parting,
+                    *parting_across,
+                    *pull,
+                    angle_deg.to_radians(),
+                    *two_sided,
+                )
+            }
             .map_err(|e| match e {
                 k::KernelError::InvalidInput(m) => {
                     DocError::ProductLimit(format!("{id}: {label}: {m}"))
