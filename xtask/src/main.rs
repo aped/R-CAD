@@ -65,7 +65,9 @@ fn check_layout() -> bool {
 }
 
 fn check_public_text() -> bool {
-    eprintln!("==> public text: no development-process references in tracked files");
+    eprintln!(
+        "==> public text: no development-process or other-product references in tracked files"
+    );
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     match public_text::offenders(&root) {
         Ok(found) if found.is_empty() => {
@@ -77,8 +79,8 @@ fn check_public_text() -> bool {
                 eprintln!("    {f}");
             }
             eprintln!(
-                "<== public text: FAILED: {} reference(s) to development runs, session specs or \
-                 local notes; describe the feature, ADR or doc instead",
+                "<== public text: FAILED: {} reference(s) to development runs, session specs, \
+                 local notes or another product; describe the feature, ADR or doc instead",
                 found.len()
             );
             false

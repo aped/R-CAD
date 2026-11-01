@@ -5,6 +5,11 @@
 //!
 //! The same pass refuses the project's former name (see [`find_old_name`]): the
 //! rename to R-CAD kept no compatibility code, so any mention is a leftover.
+//!
+//! It also refuses names of a commercial CAD product and its vendor (see
+//! [`find_vendor_name`]). Tracked text describes R-CAD's behaviour on its own
+//! terms; the only exceptions are the scripting API identifiers that user
+//! scripts import.
 use std::path::Path;
 use std::process::Command;
 
@@ -29,6 +34,51 @@ const OLD_PRODUCT: &str = concat!("fiss", "ion", "420");
 const OLD_PREFIX: &str = concat!("f", "420");
 
 const OLD_NAME_HINT: &str = "former project name; the project is R-CAD";
+
+/// A commercial CAD product and vendor, built from parts like [`OLD_PRODUCT`].
+const VENDOR_WORDS: &[&str] = &[concat!("fu", "sion"), concat!("auto", "desk")];
+
+/// Scripting API identifiers that user scripts depend on, so they keep the
+/// product's spelling: whole identifiers, compared case-sensitively.
+const API_NAMES: &[&str] = &[
+    concat!("Fu", "sionSolidEnvironment"),
+    concat!("Fu", "sionDesignDocumentType"),
+    concat!("Fu", "sionUnitsManager"),
+    concat!("fu", "sionUnitsManager"),
+    concat!("auto", "deskProduct"),
+];
+
+const VENDOR_HINT: &str = "describe the behaviour without naming another product";
+
+/// The first mention of the commercial product or its vendor in `text`, if
+/// any (case-insensitive, where the word starts: inside a longer word such as
+/// "con…" or "dif…" it passes). Allowed: the `adsk` package's submodule
+/// (`adsk.<name>` or `adsk/<name>`), the identifiers in [`API_NAMES`], and an
+/// add-in manifest's product line, whose value that file format requires.
+pub fn find_vendor_name(text: &str) -> Option<String> {
+    if text.contains(concat!("\"auto", "deskProduct\"")) {
+        return None;
+    }
+    let lower = text.to_ascii_lowercase();
+    let b = lower.as_bytes();
+    let word = |c: &u8| c.is_ascii_alphanumeric() || *c == b'_';
+    for w in VENDOR_WORDS {
+        for (i, _) in lower.match_indices(w) {
+            if i > 0 && b[i - 1].is_ascii_alphanumeric() {
+                continue;
+            }
+            if i >= 5 && matches!(&lower[i - 5..i], "adsk." | "adsk/") {
+                continue;
+            }
+            let end = i + b[i..].iter().take_while(|c| word(c)).count();
+            if API_NAMES.contains(&&text[i..end]) {
+                continue;
+            }
+            return Some(snippet(text, i, w.len()));
+        }
+    }
+    None
+}
 
 /// The first mention of the former project name in `text`, if any
 /// (case-insensitive). The product name matches anywhere. The short prefix
@@ -130,6 +180,9 @@ pub fn offenders(root: &Path) -> Result<Vec<String>, String> {
         if let Some(m) = find_marker(&path).filter(|_| markers) {
             found.push(format!("{path}: name contains \"{m}\""));
         }
+        if let Some(m) = find_vendor_name(&path) {
+            found.push(format!("{path}: name contains \"{m}\" ({VENDOR_HINT})"));
+        }
         // Deleted-but-unstaged files and binaries are skipped.
         let Ok(text) = std::fs::read_to_string(root.join(&path)) else {
             continue;
@@ -141,6 +194,9 @@ pub fn offenders(root: &Path) -> Result<Vec<String>, String> {
             if let Some(m) = find_marker(line).filter(|_| markers) {
                 found.push(format!("{path}:{}: \"{m}\"", n + 1));
             }
+            if let Some(m) = find_vendor_name(line) {
+                found.push(format!("{path}:{}: \"{m}\" ({VENDOR_HINT})", n + 1));
+            }
         }
     }
     Ok(found)
@@ -148,7 +204,7 @@ pub fn offenders(root: &Path) -> Result<Vec<String>, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{find_marker, find_old_name};
+    use super::{find_marker, find_old_name, find_vendor_name};
 
     #[test]
     fn former_project_name_is_found() {
@@ -221,6 +277,47 @@ mod tests {
             "a 3 mm runout",
         ] {
             assert!(find_marker(s).is_none(), "{s}");
+        }
+    }
+
+    #[test]
+    fn vendor_names_are_found() {
+        // `{F}` and `{A}` stand for the two names, substituted at run time.
+        let (f, a) = (concat!("Fu", "sion"), concat!("Auto", "desk"));
+        for s in [
+            "as in {F}'s rectangular pattern",
+            "{A} {F} is the reference",
+            "keymap: {f}",
+            "rcad-cli {f}-script",
+            "docs/{F}_SCRIPTS.md",
+            "compat/{f}/rcad_{f}_bootstrap.py",
+            "KeymapLayer::{F}",
+        ] {
+            let s = s
+                .replace("{F}", f)
+                .replace("{A}", a)
+                .replace("{f}", &f.to_ascii_lowercase());
+            assert!(find_vendor_name(&s).is_some(), "{s}");
+        }
+    }
+
+    #[test]
+    fn scripting_api_names_and_other_words_pass() {
+        let f = concat!("fu", "sion");
+        for s in [
+            format!("import adsk.core, adsk.{f}"),
+            format!("compat/scripting/adsk/{f}.py"),
+            format!("env = adsk.{f}.{}", concat!("Fu", "sionSolidEnvironment")),
+            format!("design.{}", concat!("fu", "sionUnitsManager")),
+            format!(
+                "  \"{}\": \"{}\",",
+                concat!("auto", "deskProduct"),
+                concat!("Fu", "sion")
+            ),
+            format!("to avoid con{f}"),
+            format!("thermal dif{f}"),
+        ] {
+            assert!(find_vendor_name(&s).is_none(), "{s}");
         }
     }
 }
