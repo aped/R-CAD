@@ -1,11 +1,12 @@
-"""Unit tests for the recorder behind R-CAD's subset of the Fusion add-in API.
+"""Unit tests for the recorder behind R-CAD's subset of the add-in scripting API.
 
-    python3 -m unittest discover -s compat/fusion/tests
+    python3 -m unittest discover -s compat/scripting/tests
 
-(also run by `cargo test -p rcad-cli`, crates/rcad-cli/tests/fusion_script.rs).
+(also run by `cargo test -p rcad-cli`, crates/rcad-cli/tests/pyscript.rs).
 """
 
 import math
+import re
 import os
 import sys
 import unittest
@@ -345,9 +346,9 @@ class Subset(unittest.TestCase):
         with self.assertRaises(adsk.NotSupported) as c:
             root.features.loftFeatures
         self.assertEqual(
-            str(c.exception), "adsk.fusion.Features.loftFeatures is not in R-CAD's Fusion API subset"
+            str(c.exception), "adsk.fusion.Features.loftFeatures is not in R-CAD's scripting API subset"
         )
-        with self.assertRaisesRegex(adsk.NotSupported, r"adsk\.fusion\.SweepFeatures is not"):
+        with self.assertRaisesRegex(adsk.NotSupported, re.escape("adsk.fusion.SweepFeatures") + " is not"):
             adsk.fusion.SweepFeatures
         with self.assertRaisesRegex(adsk.NotSupported, r"adsk\.core\.Vector3D is not"):
             adsk.core.Vector3D.create(1, 0, 0)

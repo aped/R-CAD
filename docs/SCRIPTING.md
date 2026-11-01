@@ -1,35 +1,35 @@
-# Fusion-style Python scripts and add-ins
+# Python scripts and add-ins
 
-R-CAD runs Python scripts written against a subset of the Fusion add-in API surface
+R-CAD runs Python scripts written against a subset of the add-in scripting API surface
 (`adsk.core`, `adsk.fusion`). The scripts are the kind that build a part: sketches, extrusions,
 a shell, fillets, user parameters, and the plastic features and rules. Add-ins (a folder with a
-manifest, whose commands have dialogs) run headless with `rcad-cli fusion-addin`; see
+manifest, whose commands have dialogs) run headless with `rcad-cli addin`; see
 [Add-ins](#add-ins).
 
-The `adsk` package in `compat/fusion/adsk/` is an independent, pure-Python (standard library)
-implementation. It was written from the public API reference on help.autodesk.com. No Autodesk
-code, samples or documentation text are used. R-CAD is not affiliated with or endorsed by
-Autodesk.
+The `adsk` package in `compat/scripting/adsk/` is an independent, pure-Python (standard library)
+implementation. It was written from the public API reference. No vendor code, samples or
+documentation text are used. R-CAD is not affiliated with or endorsed by the vendor of any
+commercial application.
 
 The package does not model anything itself. It records each supported call as R-CAD commands
 (docs/COMMANDS.md); the CLI then runs them in a session as `rcad-cli run` does. A member
 outside the subset raises `adsk.NotSupported` naming it:
 
 ```text
-adsk.fusion.Features.loftFeatures is not in R-CAD's Fusion API subset
+adsk.fusion.Features.loftFeatures is not in R-CAD's scripting API subset
 ```
 
 ## Running a script
 
 ```sh
-rcad-cli fusion-script SCRIPT.py [--out DOC.rcad.json] [--commands OUT.json]
+rcad-cli script SCRIPT.py [--out DOC.rcad.json] [--commands OUT.json]
 ```
 
 - The script runs under `python3 -I` (isolated mode; set `RCAD_PYTHON` to choose another
   interpreter). The script itself is not modified.
 - The `adsk` package and a small bootstrap are built into `rcad-cli`. They are written to a
   private temporary directory for the run.
-- The bootstrap imports the script, calls `run(context)` (Fusion's entry point), then
+- The bootstrap imports the script, calls `run(context)` (the API's entry point), then
   `stop(context)` if the script defines it. The script's directory is on `sys.path`, so it can
   import modules beside it.
 - `print` output and message boxes go to standard error.
@@ -162,10 +162,10 @@ was stored keep their plain values.
 - **Components and occurrences:** only the root component; `occurrenceForCreation` and
   `creationOccurrence` must be `None`.
 - **Sketch axes on the XZ and YZ planes:** sketch coordinates use R-CAD's plane axes
-  (`WorldXZ`: x = X, y = Z, normal −Y; `WorldYZ`: x = Y, y = Z, normal +X). Fusion's own
-  axes on those planes may differ, so scripts sketching there should be checked. Points on
+  (`WorldXZ`: x = X, y = Z, normal −Y; `WorldYZ`: x = Y, y = Z, normal +X). The reference
+  application's axes on those planes may differ, so scripts sketching there should be checked. Points on
   faces use R-CAD's face frames, which for a face parallel to XY are world X and Y.
-- **Profiles:** `sketch.profiles` holds one profile, the whole sketch. Fusion splits sketches
+- **Profiles:** `sketch.profiles` holds one profile, the whole sketch. The API splits sketches
   into regions; `item(i)` for `i > 0` returns `None`.
 - **Coincident points:** line end points at the same coordinates are merged into one sketch
   point, so loops drawn from `Point3D`s close. Standalone points are never merged.
@@ -196,26 +196,26 @@ was stored keep their plain values.
 ## Add-ins
 
 ```sh
-rcad-cli fusion-addin ADDIN_DIR --list
-rcad-cli fusion-addin ADDIN_DIR [--command ID] [--input ID=VALUE ...] [--base SCRIPT.py]
+rcad-cli addin ADDIN_DIR --list
+rcad-cli addin ADDIN_DIR [--command ID] [--input ID=VALUE ...] [--base SCRIPT.py]
                                 [--out DOC.rcad.json] [--commands OUT.json]
 ```
 
-An add-in is a folder `Name/` with `Name.manifest` and `Name.py`. Fusion keeps add-ins loaded
+An add-in is a folder `Name/` with `Name.manifest` and `Name.py`. The reference application keeps add-ins loaded
 and shows their commands as buttons; each command opens a dialog of inputs. R-CAD has no such
 user interface for them, so the CLI plays the user's part for one command and then runs the
-recorded R-CAD commands exactly as `fusion-script` does (same output, `--out`, `--commands`
+recorded R-CAD commands exactly as `script` does (same output, `--out`, `--commands`
 and checks).
 
 **Manifest.** The manifest is JSON. `type` must be `"addin"`. A `"script"` manifest is refused
-with a pointer to `fusion-script`, and so is a manifest with no type or with invalid JSON.
+with a pointer to `script`, and so is a manifest with no type or with invalid JSON.
 `id`, `author`, `version`, `autodeskProduct` and `supportedOS` must be strings and
 `runOnStartup` a boolean when present. `description` may be a string or the localized object
 form. These values are shown by `--list` and otherwise not used. If no `<folder
 name>.manifest` exists, a single other `.manifest` in the folder is used. A folder with a
 native library and no `.py` is refused, since C++ add-ins are not supported.
 
-**Exit status** as for `fusion-script`. 1 also covers an input value the add-in cannot take,
+**Exit status** as for `script`. 1 also covers an input value the add-in cannot take,
 inputs its `validateInputs` handler rejects, and a command that cannot be chosen. 2 also
 covers a folder, manifest or `.py` that cannot be read and a manifest that is not an add-in's.
 `--list` together with `--command`, `--input`, `--out` or `--commands` is a usage error (64).
@@ -238,7 +238,7 @@ covers a folder, manifest or `.py` that cannot be read and a manifest that is no
    would stay disabled. Selection inputs with fewer selections than their minimum are refused
    too.
 6. `executePreview`, if connected, fires in a forked child process. Whatever it records is
-   discarded with the process, as a preview is discarded in Fusion. If the handler sets
+   discarded with the process, as a preview is discarded by the reference application. If the handler sets
    `args.isValidResult = True`, the preview is fired again in the main process and kept, and
    `execute` is skipped. A preview that fails is reported on standard error and discarded.
    Without `fork` (not Linux/Unix) previews are skipped.
@@ -280,7 +280,7 @@ and planes are not counted. `i` is the face collection's `item(i)` index, 0 by d
 `body:n` is the n-th body. Only extrusions have addressable faces. Filters `Faces` and
 `PlanarFaces` take faces, `Bodies` and `SolidBodies` take bodies, no filter takes either, and
 other filters (edges, sketch curves, vertices, ...) take nothing. `--base SCRIPT.py` runs a
-Fusion-style script first, in the same design. It stands in for the document open when the
+script first, in the same design. It stands in for the document open when the
 command is started. An add-in may also pre-fill a selection input from its own geometry with
 `addSelection`.
 
@@ -294,7 +294,7 @@ command is started. An add-in may also pre-fill a selection input from its own g
 | Events: `add(handler)`, `remove(handler)`, `name`, `sender` | `add` needs an object with `notify(args)` and returns `False` for a handler already added. The `handler` annotation of `add` names the handler class in `adsk.core`, for helper code that subclasses it |
 | `EventHandler`, `CommandCreatedEventHandler`, `CommandEventHandler`, `InputChangedEventHandler`, `ValidateInputsEventHandler` | plain base classes; subclasses keep any state |
 | `CommandCreatedEventArgs.command`; `CommandEventArgs.command`, `.executeFailed`, `.executeFailedMessage`, `.isValidResult`, `.terminationReason`; `InputChangedEventArgs.input`, `.inputs`; `ValidateInputsEventArgs.inputs`, `.areInputsValid`; `.firingEvent` on all | |
-| `UserInterface.workspaces.itemById(id)`, `.allToolbarPanels`, `.allToolbarTabs`; `Workspace.toolbarPanels`, `.toolbarTabs`; `ToolbarTabs`/`ToolbarPanels` `itemById`, `add`; `ToolbarPanel.controls`: `addCommand(def, positionID, isBefore)`, `addSeparator`, `addDropDown(...).controls`, `itemById`; `CommandControl.isPromoted`, `.isPromotedByDefault`, `.isVisible`, `.deleteMe()` | placement is recorded and shown by `--list`. Fusion's built-in workspace, tab and panel ids are not modelled, so `itemById` of any id returns a placeholder instead of `None` |
+| `UserInterface.workspaces.itemById(id)`, `.allToolbarPanels`, `.allToolbarTabs`; `Workspace.toolbarPanels`, `.toolbarTabs`; `ToolbarTabs`/`ToolbarPanels` `itemById`, `add`; `ToolbarPanel.controls`: `addCommand(def, positionID, isBefore)`, `addSeparator`, `addDropDown(...).controls`, `itemById`; `CommandControl.isPromoted`, `.isPromotedByDefault`, `.isVisible`, `.deleteMe()` | placement is recorded and shown by `--list`. The reference application's built-in workspace, tab and panel ids are not modelled, so `itemById` of any id returns a placeholder instead of `None` |
 | `CommandTerminationReason`, `DropDownStyles` | named values (R-CAD's own numbers) |
 
 **Limits.** There is no interactive dialog, and no session: one command runs once per call,
@@ -302,11 +302,11 @@ and the result is the recorded model. Previews are discarded (except with `isVal
 Palettes, HTML, custom graphics, mouse and keyboard events, `activeSelections`,
 `CommandDefinition.execute(input)` with an argument, check-box definitions, and the add-in
 being started at application startup are not emulated. Uncaught handler exceptions fail
-the run, where Fusion may only log them. Only Python add-ins run; C++ add-ins are refused.
+the run, where the reference application may only log them. Only Python add-ins run; C++ add-ins are refused.
 
 ## Examples
 
-- `compat/fusion/examples/addins/PlasticBoxAddin/`: an add-in with one command,
+- `compat/scripting/examples/addins/PlasticBoxAddin/`: an add-in with one command,
   `PlasticBoxCommand` ("Plastic box"). Its inputs are width, depth and height (80 × 50 × 25
   mm), wall (2 mm), bosses per side (spinner 0..6, 2), "Add web" (true) and a rule preset
   drop-down (ABS, PC, PP, PA66). A read-only text box shows the size and is updated from
@@ -318,28 +318,28 @@ the run, where Fusion may only log them. Only Python add-ins run; C++ add-ins ar
   from rim to floor.
 
 ```sh
-rcad-cli fusion-addin compat/fusion/examples/addins/PlasticBoxAddin --list
-rcad-cli fusion-addin compat/fusion/examples/addins/PlasticBoxAddin \
+rcad-cli addin compat/scripting/examples/addins/PlasticBoxAddin --list
+rcad-cli addin compat/scripting/examples/addins/PlasticBoxAddin \
     --input width="100 mm" --input bosses=3 --input web=false --input rule=PP --out box.rcad.json
 ```
 
 Scripts:
 
-- `compat/fusion/examples/plate_with_hole.py`: a 100 × 60 mm plate whose 8 mm thickness is a
+- `compat/scripting/examples/plate_with_hole.py`: a 100 × 60 mm plate whose 8 mm thickness is a
   user parameter (`createByReal(0.8)`, i.e. cm), with a 15 mm hole cut down from the top face.
   Both extrusions are bound to the parameter.
-- `compat/fusion/examples/plastic_box.py`: an 80 × 50 × 25 mm box shelled to 2 mm and given a
+- `compat/scripting/examples/plastic_box.py`: an 80 × 50 × 25 mm box shelled to 2 mm and given a
   copy of the ABS rule. It has four 15 mm bosses on the floor with 6 mm pilot holes, a web from
   the rim to the floor, and a rib across the cavity.
 
 ```sh
-rcad-cli fusion-script compat/fusion/examples/plastic_box.py --out box.rcad.json --commands box.json
+rcad-cli script compat/scripting/examples/plastic_box.py --out box.rcad.json --commands box.json
 rcad-cli run box.json        # the same model from the recorded commands
 ```
 
 ## Tests
 
-- `crates/rcad-cli/tests/fusion_script.rs` (`cargo test -p rcad-cli`; skipped with a note when
+- `crates/rcad-cli/tests/pyscript.rs` (`cargo test -p rcad-cli`; skipped with a note when
   `python3` is missing):
   - runs both examples through the binary and checks the saved volumes against hand-derived
     closed forms. The plate is 100·60·8 − π·7.5²·8. The box is the shell
@@ -348,7 +348,7 @@ rcad-cli run box.json        # the same model from the recorded commands
   - replays the recorded commands with `rcad-cli run`;
   - checks the cm→mm and inch conversion, an unsupported member (and one the script catches),
     Python errors, a refused step and the exit codes.
-  - runs `PlasticBoxAddin` through `fusion-addin`. `--list` gives the command, its inputs
+  - runs `PlasticBoxAddin` through `addin`. `--list` gives the command, its inputs
     and their defaults. With the default inputs the volume is
     80·50·25 − 76·46·23 + 4(π·3²·18 − π·1.25²·6) + 76·2·23 (shell, bosses, web). With
     `width=100 mm depth=6 cm wall=2.5 bosses=3 web=false rule=PP` it is
@@ -358,33 +358,34 @@ rcad-cli run box.json        # the same model from the recorded commands
     using an unsupported member (in `execute` and in `commandCreated`). A selection names
     the top face of a `--base` script's 30 × 30 × 10 mm block, and the add-in joins a
     10 × 10 × 6.35 mm block onto it;
-- `compat/fusion/tests/test_recorder.py` (`python3 -m unittest discover -s compat/fusion/tests`,
+- `compat/scripting/tests/test_recorder.py` (`python3 -m unittest discover -s compat/scripting/tests`,
   also run by the Rust test): units, feature and body ids, face roles, offset planes,
   expressions and bindings, shell, fillet, boss, rib and web mappings, rules, and
   `NotSupported` messages.
-- `compat/fusion/tests/test_events.py`: events and handlers, command definitions, toolbar
+- `compat/scripting/tests/test_events.py`: events and handlers, command definitions, toolbar
   placement, every input kind's value and expression semantics, selections and filters, the
   units manager, and the add-in driver. The driver tests cover the event order, the
   discarded and the kept preview, validation, `executeFailed`, command choice, `--base`
   selections, relative imports and unsupported members.
 
 These tests check R-CAD's mapping against the public API reference. They are not a comparison
-with Fusion.
+with the reference application.
 
-## Comparing with Fusion
+## Comparing with the reference application
 
-`tools/fusion_reference/` holds reference cases: Fusion API scripts that both modellers run.
+`tools/reference_compare/` holds reference cases: add-in API scripts that both modellers run.
 
-1. In Fusion: **Utilities > Scripts and Add-Ins**, add the folder
-   `tools/fusion_reference/RcadReference` and run it. It builds every case in a new design and
-   writes Fusion's measurements of each body (volume, centre of mass, bounding box, face
-   count) to `fusion_results.json` in that folder.
-2. Here: `tools/fusion_reference/compare.py` (after `cargo build --release -p rcad-cli`, or
-   with `RCAD_CLI` set). It runs each case with `rcad-cli fusion-script` and compares volumes
+1. In the reference application, add the folder
+   `tools/reference_compare/RcadReference` and run it. It builds every case in a new design and
+   writes its measurements of each body (volume, centre of mass, bounding box, face
+   count) to `reference_results.json` in that folder.
+2. Here: `tools/reference_compare/compare.py` (after `cargo build --release -p rcad-cli`, or
+   with `RCAD_CLI` set). It runs each case with `rcad-cli script` and compares volumes
    (1e-5 relative) and centres of mass (1e-3 mm), with bounding boxes as advisory. Cases with
    a closed form also check R-CAD against it first. It exits with 2 and says
-   `Fusion comparison NOT RUN` while there are no Fusion results.
+   `reference comparison NOT RUN` while there are no reference results (`--reference
+   RESULTS.json` names another results file).
 
 The cases are plain bosses, bosses with tip fillets, drafted bosses with root fillets, a web
-with root fillets in an open box, and the two examples above. No Fusion results are
-committed: the comparison has not been run against Fusion yet.
+with root fillets in an open box, and the two examples above. No reference results are
+committed: the comparison has not been run against the reference application yet.

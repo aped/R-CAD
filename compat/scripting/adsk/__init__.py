@@ -1,13 +1,14 @@
-"""R-CAD's implementation of a subset of the Fusion add-in API surface.
+"""R-CAD's implementation of a subset of the add-in scripting API surface.
 
 Scripts written for that API (``import adsk.core, adsk.fusion``) run under
-``rcad-cli fusion-script SCRIPT.py``. Every call is recorded as R-CAD
+``rcad-cli script SCRIPT.py``. Every call is recorded as R-CAD
 commands (see ``adsk._recorder``) which the CLI then executes. Anything
-outside the documented subset (docs/FUSION_SCRIPTS.md) raises
+outside the documented subset (docs/SCRIPTING.md) raises
 :class:`NotSupported` naming the member.
 
 This is an independent implementation written from the public API
-reference; it is not affiliated with or endorsed by Autodesk.
+reference; it is not affiliated with or endorsed by the vendor of any
+commercial application.
 """
 
 from adsk._recorder import NotSupported, recorder, reset  # noqa: F401

@@ -10,11 +10,10 @@ native format, the command enum, the UI registry, dialogs and Edit Feature. That
 core features. It does not scale to families of domain features such as plastic part design,
 fasteners or vents, and it gives users no way to add features of their own.
 
-Autodesk Fusion is the behavioural reference. It has add-ins: a folder with code and a JSON
-manifest, commands with dialogs built from declared inputs, and (as an API preview) custom
-features that are one timeline node with their own parameters, built from native features.
-Fusion's plastic features (Boss, Snap Fit, Lip, Rest and the plastic rules) are part of an
-extension, not core commands.
+The add-in model this follows: a folder with code and a JSON manifest, commands with dialogs
+built from declared inputs, and custom features that are one timeline node with their own
+parameters, built from native features. Plastic features (Boss, Snap Fit, Lip, Rest and the
+plastic rules) belong in an extension, not in core commands.
 
 The invariants that must hold for plugins as for core features:
 - history is authoritative (definitions and parameters are stored, not a result mesh);
@@ -84,7 +83,7 @@ The invariants that must hold for plugins as for core features:
    (`data_effects`) are applied in the same undo step: user parameters to create or update, and
    catalog materials to assign to bodies.
 
-   Rules work as in Fusion: a rule becomes parameters (`ABS_T`, `ABS_DA`, …). A new feature on a
+   A rule becomes parameters (`ABS_T`, `ABS_DA`, …). A new feature on a
    body with a rule binds each parameter that has a rule template (`T/2`) and was not given
    explicitly to the expanded expression (`ABS_T/2`). Editing the rule then regenerates every
    bound feature through the ordinary expression machinery.
@@ -118,10 +117,10 @@ The invariants that must hold for plugins as for core features:
 - Operation execution reuses the exact paths, so their limits apply to plugins too. Joins
   starting on a face must lie within it, or the target must be prismatic along the tool. Tapered
   tools take one polygon or circle.
-- External plugins run user-installed programs, as Fusion add-ins do. The host contains their
+- External plugins run user-installed programs, as add-ins generally do. The host contains their
   failures, but it does not sandbox what they can read or write. That is the installer's trust
   decision, stated in docs/PLUGINS.md.
-- Fusion add-in scripts: a documented subset of the Python `adsk` API, including the plastics
-  objects, runs through `rcad-cli fusion-script` (docs/FUSION_SCRIPTS.md). It records calls as
+- Add-in API scripts: a documented subset of the Python `adsk` API, including the plastics
+  objects, runs through `rcad-cli script` (docs/SCRIPTING.md). It records calls as
   commands on top of this interface, not as a second one. Add-in UI events and C++ add-ins are out
   of scope.

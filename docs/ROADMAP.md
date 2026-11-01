@@ -4,7 +4,7 @@ What 1.0 contains is listed in CHANGELOG.md and described in docs/COMMANDS.md an
 docs/FORMAT_SUPPORT.md. Items below are not implemented (or only partly); listing them here is
 not a claim of support or a promise of a release. Additions that keep 1.x documents and
 commands working can land in 1.x; anything that breaks them waits for 2.0. Ordered roughly by
-value per effort. Autodesk Fusion is the behavioural reference where behaviour is open.
+value per effort.
 
 ## Modeling
 - Fillets: corner blends of arbitrary edge sets and variable radii (today: single straight
@@ -35,7 +35,7 @@ value per effort. Autodesk Fusion is the behavioural reference where behaviour i
 - More plugin operations (revolve, fillets of an operation's edges, new bodies, sweeps along
   edge chains), so plastics features gain root fillets, curved ribs and swept lips
   (docs/PLASTICS.md lists today's deviations); rule assignment per component.
-- More of Fusion's add-in API in the script compatibility layer (docs/FUSION_SCRIPTS.md lists
+- More of the add-in API in the script compatibility layer (docs/SCRIPTING.md lists
   what is mapped): boss side 2, symmetric/taper extrudes, edge fillets, command/UI events.
 
 ## Interchange

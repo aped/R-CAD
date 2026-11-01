@@ -1,4 +1,4 @@
-"""Runs an add-in headless: ``rcad-cli fusion-addin`` (docs/FUSION_SCRIPTS.md).
+"""Runs an add-in headless: ``rcad-cli addin`` (docs/SCRIPTING.md).
 
 The add-in's ``run(context)`` registers command definitions and connects
 their ``commandCreated`` handlers. With no user interface, this module plays
@@ -26,7 +26,8 @@ import traceback
 import types
 
 import adsk
-from adsk import cam, core, fusion  # noqa: F401 - loaded before adsk.reset()
+import adsk.fusion  # noqa: F401 - loaded before adsk.reset()
+from adsk import cam, core  # noqa: F401 - loaded before adsk.reset()
 
 
 class AddinError(Exception):
@@ -46,7 +47,7 @@ def load_module(path, package=None):
     if folder not in sys.path:
         sys.path.append(folder)
     stem = os.path.splitext(os.path.basename(path))[0]
-    name = stem if stem.isidentifier() else "fusion_script"
+    name = stem if stem.isidentifier() else "user_script"
     if package is not None:
         base = os.path.basename(os.path.abspath(package))
         pkg_name = "rcad_addin_" + "".join(c if c.isalnum() else "_" for c in base)
@@ -269,7 +270,7 @@ def _check(rec):
 
 
 def execute(request):
-    """Run the request (see ``rcad_fusion_bootstrap.py --addin``)."""
+    """Run the request (see ``rcad_script_bootstrap.py --addin``)."""
     rec = adsk.reset()
     try:
         base = request.get("base")
@@ -315,7 +316,7 @@ def execute(request):
                 kept, problem = _preview_in_child(cmd)
                 preview = "kept" if kept else "discarded"
                 if problem is not None:
-                    sys.stderr.write("fusion-addin: the preview failed (discarded): %s\n" % problem)
+                    sys.stderr.write("addin: the preview failed (discarded): %s\n" % problem)
                     kept, preview = False, "failed"
         if kept:
             args = core.CommandEventArgs(cmd._preview, cmd)

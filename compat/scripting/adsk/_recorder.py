@@ -21,7 +21,7 @@ import sys
 
 
 class NotSupported(RuntimeError):
-    """A member outside R-CAD's Fusion API subset, or a case it cannot map."""
+    """A member outside R-CAD's scripting API subset, or a case it cannot map."""
 
     def __init__(self, message):
         super().__init__(message)
@@ -29,7 +29,7 @@ class NotSupported(RuntimeError):
 
 
 def not_in_subset(qualname):
-    return NotSupported("%s is not in R-CAD's Fusion API subset" % qualname)
+    return NotSupported("%s is not in R-CAD's scripting API subset" % qualname)
 
 
 class Base:

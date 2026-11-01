@@ -194,7 +194,7 @@ ring (outer minus inner rectangle), the inner rectangle minus the circle, and th
 * API: `Sketch::regions()` (each with `RegionRef`, depth, area), `Sketch::region_by_ref`,
   `Sketch::region_at(point)`; tests `crates/rcad-sketch/src/tests_regions_pick.rs`,
   `crates/rcad-commands/tests/it/regions.rs`, `crates/rcad/tests/it/region_pick_ui.rs`.
-* **Crossing, touching and T-joined curves** (as Fusion offers them): when the curves are not
+* **Crossing, touching and T-joined curves**: when the curves are not
   disjoint simple loops, the regions are the bounded faces of their planar arrangement. Lines,
   arcs and circles are split at their exact intersections (and where an end lies on another
   curve), dangling pieces (overhangs, stems) are ignored, and each bounded face is a region with
@@ -283,12 +283,12 @@ No polyline ever stands in for the geometry.
   that semi-axis, its direction the orientation) and the other semi-axis `minor` (a solver
   unknown like a circle radius): 5 DOF. Dimensions: `EllipseRadius` (`major`: |axis end −
   centre|; otherwise `minor`). A full ellipse is a closed loop of its own (four exact quarter
-  spans, so an extruded ellipse has four side faces where Fusion shows one). Area πab.
+  spans, so an extruded ellipse has four side faces rather than one). Area πab.
 * **Spline** (`Entity::Spline`): uniform cubic B-spline whose control points are ordinary sketch
   points (2 DOF each; fix, dimension or constrain them like any point). Open: clamped, ≥ 4 control
   points, passes through the first and last, which join lines/arcs (shared or coincident
-  points) into a closed loop. Closed: periodic, ≥ 3 control points, a loop of its own. Fusion's
-  fit-point splines (through points) are not available; this is the control-point spline.
+  points) into a closed loop. Closed: periodic, ≥ 3 control points, a loop of its own.
+  Fit-point splines (through points) are not available; this is the control-point spline.
 * **Regions**: ellipses and closed splines nest like circles (an elliptical hole in a rectangle
   is a region with one hole). Self-intersection, contact and containment tests use a polyline
   within δ = max(1e-6 mm, 1e-5 × the loop's own size) of the exact curve (convex-hull subdivision
@@ -414,7 +414,7 @@ of the arc, or the refusal reason), Enter. One undo step.
   Extend, Break, drags and deleting their pins are refused with the reason) and can be
   dimensioned and constrained to at once. **Projection Link** (shown with the tools, on by
   default) off copies the curves unlinked.
-* **Auto-project face edges** (Fusion's default, on): a new sketch on a planar face starts with
+* **Auto-project face edges** (on by default): a new sketch on a planar face starts with
   that face's edges projected, as construction so they stay out of profiles. Preferences ▸
   Sketch ▸ "Auto-project face edges" turns it off (saved in the preferences file).
 * **Auto-project edges on reference** (Preferences ▸ Sketch, off by default, saved in the

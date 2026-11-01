@@ -3,7 +3,7 @@
 	"type": "script",
 	"author": "",
 	"description": {
-		"": "Builds the R-CAD reference cases and writes Fusion's body measurements to fusion_results.json"
+		"": "Builds the R-CAD reference cases and writes the reference body measurements to reference_results.json"
 	},
 	"supportedOS": "windows|mac",
 	"editEnabled": true

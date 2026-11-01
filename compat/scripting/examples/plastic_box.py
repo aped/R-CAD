@@ -2,7 +2,7 @@
 rule, four screw bosses on the floor, a web from the rim down to the floor
 and a rib across the cavity.
 
-Run with:  rcad-cli fusion-script compat/fusion/examples/plastic_box.py --out box.rcad.json
+Run with:  rcad-cli script compat/scripting/examples/plastic_box.py --out box.rcad.json
 
 Reals are in the API's internal units (cm, radians).
 """

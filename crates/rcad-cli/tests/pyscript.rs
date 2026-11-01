@@ -1,4 +1,4 @@
-//! `rcad-cli fusion-script` and `rcad-cli fusion-addin` (docs/FUSION_SCRIPTS.md) through
+//! `rcad-cli script` and `rcad-cli addin` (docs/SCRIPTING.md) through
 //! the built binary: the examples against hand-derived closed-form volumes, unit
 //! conversion, unsupported members, script errors, add-in manifests, command listing,
 //! inputs, validation and selections, and the Python unit tests of the recorder and the
@@ -22,7 +22,7 @@ fn have_python() -> bool {
         .output()
         .is_ok_and(|o| o.status.success());
     if !ok {
-        eprintln!("python3 is not installed: fusion-script tests skipped");
+        eprintln!("python3 is not installed: script tests skipped");
     }
     ok
 }
@@ -38,7 +38,7 @@ fn cli(args: &[&Path]) -> Output {
 
 /// An empty data directory, so no installed external plugins are loaded.
 fn tmp_data() -> PathBuf {
-    let d = std::env::temp_dir().join(format!("rcad-fusion-test-data-{}", std::process::id()));
+    let d = std::env::temp_dir().join(format!("rcad-pyscript-test-data-{}", std::process::id()));
     std::fs::create_dir_all(&d).unwrap();
     d
 }
@@ -47,12 +47,12 @@ fn text(b: &[u8]) -> String {
     String::from_utf8_lossy(b).into_owned()
 }
 
-/// `fusion-script SCRIPT --out DOC --commands CMDS` in `dir`.
-fn fusion(script: &Path, dir: &Path) -> (Output, PathBuf, PathBuf) {
+/// `script SCRIPT --out DOC --commands CMDS` in `dir`.
+fn run_script(script: &Path, dir: &Path) -> (Output, PathBuf, PathBuf) {
     let doc = dir.join("doc.rcad.json");
     let cmds = dir.join("commands.json");
     let o = cli(&[
-        Path::new("fusion-script"),
+        Path::new("script"),
         script,
         Path::new("--out"),
         &doc,
@@ -94,8 +94,8 @@ fn assert_close(got: f64, want: f64, what: &str) {
 /// and return the saved body volumes.
 fn example(name: &str) -> Vec<f64> {
     let dir = tempfile::tempdir().unwrap();
-    let script = repo().join("compat/fusion/examples").join(name);
-    let (o, doc, cmds) = fusion(&script, dir.path());
+    let script = repo().join("compat/scripting/examples").join(name);
+    let (o, doc, cmds) = run_script(&script, dir.path());
     assert!(
         o.status.success(),
         "{name}: {}\n{}",
@@ -177,7 +177,7 @@ def run(context):
 "
         ),
     );
-    let (o, doc, cmds) = fusion(&script, dir.path());
+    let (o, doc, cmds) = run_script(&script, dir.path());
     assert!(o.status.success(), "{}", text(&o.stderr));
     let cmds: Vec<Value> = serde_json::from_str(&std::fs::read_to_string(cmds).unwrap()).unwrap();
     let d: Vec<f64> = cmds
@@ -206,12 +206,12 @@ def run(context):
     root.features.loftFeatures.createInput(adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
 ",
     );
-    let (o, doc, _) = fusion(&script, dir.path());
+    let (o, doc, _) = run_script(&script, dir.path());
     assert_eq!(o.status.code(), Some(1));
     let err = text(&o.stderr);
     assert!(
         err.contains(
-            "not supported: adsk.fusion.Features.loftFeatures is not in R-CAD's Fusion API subset"
+            "not supported: adsk.fusion.Features.loftFeatures is not in R-CAD's scripting API subset"
         ),
         "{err}"
     );
@@ -244,11 +244,11 @@ def run(context):
 "
         ),
     );
-    let (o, _, _) = fusion(&script, dir.path());
+    let (o, _, _) = run_script(&script, dir.path());
     assert_eq!(o.status.code(), Some(1));
     let err = text(&o.stderr);
     assert!(
-        err.contains("adsk.fusion.Features.chamferFeatures is not in R-CAD's Fusion API subset"),
+        err.contains("adsk.fusion.Features.chamferFeatures is not in R-CAD's scripting API subset"),
         "{err}"
     );
     assert!(err.contains("which caught it"), "{err}");
@@ -261,20 +261,20 @@ fn python_errors_and_missing_scripts_are_reported() {
     }
     let dir = tempfile::tempdir().unwrap();
     let script = write_script(dir.path(), "def run(context):\n    1 / 0\n");
-    let (o, _, _) = fusion(&script, dir.path());
+    let (o, _, _) = run_script(&script, dir.path());
     assert_eq!(o.status.code(), Some(1));
     let err = text(&o.stderr);
     assert!(err.contains("Python error: ZeroDivisionError"), "{err}");
     assert!(err.contains("Traceback"), "{err}");
 
     let script = write_script(dir.path(), "x = 1\n");
-    let (o, _, _) = fusion(&script, dir.path());
+    let (o, _, _) = run_script(&script, dir.path());
     assert_eq!(o.status.code(), Some(1));
     assert!(text(&o.stderr).contains("no run(context) function"));
 
-    let (o, _, _) = fusion(&dir.path().join("missing.py"), dir.path());
+    let (o, _, _) = run_script(&dir.path().join("missing.py"), dir.path());
     assert_eq!(o.status.code(), Some(2));
-    let o = cli(&[Path::new("fusion-script")]);
+    let o = cli(&[Path::new("script")]);
     assert_eq!(o.status.code(), Some(64));
 }
 
@@ -299,7 +299,7 @@ def run(context):
 "
         ),
     );
-    let (o, doc, cmds) = fusion(&script, dir.path());
+    let (o, doc, cmds) = run_script(&script, dir.path());
     assert_eq!(o.status.code(), Some(1));
     assert!(
         text(&o.stderr).contains("extrude was refused"),
@@ -317,7 +317,7 @@ fn recorder_unit_tests_pass() {
     }
     let o = Command::new("python3")
         .args(["-I", "-m", "unittest", "discover", "-s"])
-        .arg(repo().join("compat/fusion/tests"))
+        .arg(repo().join("compat/scripting/tests"))
         .output()
         .unwrap();
     assert!(
@@ -329,17 +329,17 @@ fn recorder_unit_tests_pass() {
 }
 
 // ---------------------------------------------------------------------------
-// fusion-addin
+// addin
 
 fn plastic_box_addin() -> PathBuf {
-    repo().join("compat/fusion/examples/addins/PlasticBoxAddin")
+    repo().join("compat/scripting/examples/addins/PlasticBoxAddin")
 }
 
-/// `fusion-addin DIR ARGS... --out DOC --commands CMDS` in `dir`.
+/// `addin DIR ARGS... --out DOC --commands CMDS` in `dir`.
 fn addin(addin_dir: &Path, args: &[&str], dir: &Path) -> (Output, PathBuf, PathBuf) {
     let doc = dir.join("doc.rcad.json");
     let cmds = dir.join("commands.json");
-    let mut all: Vec<&Path> = vec![Path::new("fusion-addin"), addin_dir];
+    let mut all: Vec<&Path> = vec![Path::new("addin"), addin_dir];
     all.extend(args.iter().map(Path::new));
     all.extend([Path::new("--out"), &doc, Path::new("--commands"), &cmds]);
     let o = cli(&all);
@@ -391,7 +391,7 @@ fn addin_list_shows_the_commands_and_their_inputs() {
         return;
     }
     let o = cli(&[
-        Path::new("fusion-addin"),
+        Path::new("addin"),
         &plastic_box_addin(),
         Path::new("--list"),
     ]);
@@ -586,7 +586,7 @@ fn a_manifest_that_is_not_an_addin_is_refused() {
     assert_eq!(o.status.code(), Some(2));
     let err = text(&o.stderr);
     assert!(
-        err.contains("describes a script, not an add-in") && err.contains("fusion-script"),
+        err.contains("describes a script, not an add-in") && err.contains("script"),
         "{err}"
     );
 
@@ -606,9 +606,9 @@ fn a_manifest_that_is_not_an_addin_is_refused() {
     assert_eq!(o.status.code(), Some(2));
     assert!(text(&o.stderr).contains("has no Empty.manifest"));
 
-    let o = cli(&[Path::new("fusion-addin")]);
+    let o = cli(&[Path::new("addin")]);
     assert_eq!(o.status.code(), Some(64));
-    let o = cli(&[Path::new("fusion-addin"), &empty, Path::new("--input")]);
+    let o = cli(&[Path::new("addin"), &empty, Path::new("--input")]);
     assert_eq!(o.status.code(), Some(64));
 }
 
@@ -632,8 +632,8 @@ fn an_addin_using_an_unsupported_member_fails_naming_it() {
     let err = text(&o.stderr);
     assert!(
         err.contains(
-            "fusion-addin: not supported: adsk.fusion.Features.loftFeatures is not in R-CAD's \
-             Fusion API subset"
+            "addin: not supported: adsk.fusion.Features.loftFeatures is not in R-CAD's \
+             scripting API subset"
         ),
         "{err}"
     );
@@ -647,7 +647,7 @@ fn an_addin_using_an_unsupported_member_fails_naming_it() {
         ADDIN_MANIFEST,
         &handler_addin("pass", "inputs.addTableCommandInput('t', 'T', 2, '1:1')"),
     );
-    let o = cli(&[Path::new("fusion-addin"), &d, Path::new("--list")]);
+    let o = cli(&[Path::new("addin"), &d, Path::new("--list")]);
     assert_eq!(o.status.code(), Some(1));
     assert!(
         text(&o.stderr).contains("adsk.core.CommandInputs.addTableCommandInput"),

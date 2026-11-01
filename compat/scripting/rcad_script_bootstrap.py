@@ -1,15 +1,15 @@
-"""Runs a script written for a subset of the Fusion add-in API surface and
+"""Runs a script written for a subset of the add-in scripting API surface and
 writes the recorded R-CAD commands as JSON.
 
-    python3 -I rcad_fusion_bootstrap.py SCRIPT.py OUT.json
-    python3 -I rcad_fusion_bootstrap.py --addin REQUEST.json OUT.json
+    python3 -I rcad_script_bootstrap.py SCRIPT.py OUT.json
+    python3 -I rcad_script_bootstrap.py --addin REQUEST.json OUT.json
 
-Used by ``rcad-cli fusion-script``. The script is imported as a module and
+Used by ``rcad-cli script``. The script is imported as a module and
 its ``run(context)`` is called (then ``stop(context)`` if it has one). OUT
 receives ``{"steps": [...]}`` or ``{"error": {"kind", "message",
 "traceback"}}``; the exit status is 0 or 1 accordingly.
 
-With ``--addin`` (``rcad-cli fusion-addin``), REQUEST is ``{"addin": DIR,
+With ``--addin`` (``rcad-cli addin``), REQUEST is ``{"addin": DIR,
 "script": DIR/NAME.py, "list": bool, "command": ID or null, "inputs": [[ID,
 TEXT], ...], "base": SCRIPT or null}`` and the add-in is run by
 ``adsk._addin``; OUT also gets ``"addin"`` (the command run) or ``"listing"``
@@ -38,10 +38,10 @@ def execute(script):
     rec = adsk.reset()
     try:
         path = os.path.abspath(script)
-        # Like Fusion, let the script import modules next to it.
+        # Let the script import modules next to it, as the reference application does.
         sys.path.append(os.path.dirname(path))
         stem = os.path.splitext(os.path.basename(path))[0]
-        name = stem if stem.isidentifier() else "fusion_script"
+        name = stem if stem.isidentifier() else "user_script"
         spec = importlib.util.spec_from_file_location(name, path)
         if spec is None or spec.loader is None:
             return _error("python", "cannot load %s as a Python module" % script)
@@ -91,7 +91,7 @@ def main(argv):
         result = execute(argv[1])
         out = argv[2]
     else:
-        sys.stderr.write("usage: rcad_fusion_bootstrap.py [--addin REQUEST.json | SCRIPT.py] OUT.json\n")
+        sys.stderr.write("usage: rcad_script_bootstrap.py [--addin REQUEST.json | SCRIPT.py] OUT.json\n")
         return 2
     sys.stdout.flush()
     with open(out, "w", encoding="utf-8") as f:

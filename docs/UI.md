@@ -171,7 +171,7 @@ UI tests: `crates/rcad/tests/it/first_run_ui.rs`, `edit_feature_ui.rs`, `glyphs.
   plastic rule the slot binds to the rule (the field shows `rule: T/2 = ABS_T/2`); a typed value or
   expression replaces it. Edit Feature reopens the dialog with the stored values (bound slots show
   their expression) and commits one `RedefineFeature`.
-* **PLASTIC tab** (Fusion's Plastic tab): SETUP (Manage Plastic Rules…, Assign Plastic Rule…),
+* **PLASTIC tab**: SETUP (Manage Plastic Rules…, Assign Plastic Rule…),
   CREATE (Boss, Rib, Web, Snap Fit, Lip, Rest: the generic dialog for the `plastics` plugin's
   features), INSPECT (Design Advice…, Draft Analysis…, Accessibility Analysis…, Minimum Radius
   Analysis…: one button per analysis of the `plastics` plugin, a test checks none is missing).
@@ -218,7 +218,6 @@ UI tests: `crates/rcad/tests/it/first_run_ui.rs`, `edit_feature_ui.rs`, `glyphs.
 R-CAD is complete without a server. The `cloud` feature of the `rcad` crate (on by default;
 `cargo build -p rcad --no-default-features` leaves it out entirely) adds a client for an R-CAD
 sync server: organizations, projects, document versions, edit locks, share links and comments.
-The workflow follows Fusion's Data Panel where that fits a local-first app.
 
 * **Nothing without an account.** At startup the app reads only the account file
   (`<config>/r-cad/cloud.json`). With no account it starts no service thread, opens no socket,
@@ -272,7 +271,7 @@ The workflow follows Fusion's Data Panel where that fits a local-first app.
   `☁ Bracket v3 · Synced`, `Modified` (local edits since v3), `Offline · 2 pending`,
   `Conflict`, `Locked by sam` or `Read-only`. Clicking it opens the version history (and retries
   queued versions when offline).
-* **Newer version on the server** (Fusion's "out of date" indicator): while signed in with a
+* **Newer version on the server** (an "out of date" indicator): while signed in with a
   cloud document open, R-CAD asks the server for the document's latest version every 60 s, at
   once when the Data panel opens or the window regains focus (never without an account; after
   the server was unreachable it waits a full interval). When someone saved a newer version the
@@ -304,7 +303,7 @@ The workflow follows Fusion's Data Panel where that fits a local-first app.
   in with) even if `rcad-cli cloud use` changes the active account in the account file, and
   shows and checks only that account's linked files. Signing in from the app switches.
 * **File menu:** **Save to Cloud Project…** for an open document that is not on the server
-  (Fusion's first Save into a project): pick a project you can edit, a folder and a name; a
+  (the first save into a project): pick a project you can edit, a folder and a name; a
   document never saved locally goes through Save As first, and unsaved changes are saved
   locally before the upload. The file becomes the cloud document's working copy.
   **Save Version to Cloud…** (description and optional milestone; unsaved changes
@@ -320,13 +319,12 @@ The workflow follows Fusion's Data Panel where that fits a local-first app.
 * **Conflicts:** when someone saved a newer version since the one the edit started from, a window
   says so and offers to save as the next version anyway, to save as a new document
   (`<name> (copy)`) or to cancel. The local file is never touched.
-* **Edit lock** (Fusion's reservation, simplified): with Preferences ▸ Cloud ▸ "Lock cloud
+* **Edit lock** (a simplified reservation): with Preferences ▸ Cloud ▸ "Lock cloud
   documents while I edit them" (default on), the first edit of a cloud document asks for its lock;
   saving a version, opening another document or quitting releases it. A lock held by someone else
   is only shown (chip and message log): local editing and local saving always work, and Save
   Version fails until the lock is released.
-* **Upload a version on every save** (Preferences ▸ Cloud, default off; Fusion saves every
-  save as a version): when on, a successful local save of a cloud document's working copy also
+* **Upload a version on every save** (Preferences ▸ Cloud, default off): when on, a successful local save of a cloud document's working copy also
   saves it as a new version described "Saved from R-CAD", with the model thumbnail. It goes
   through the same path as Save Version: a newer version on the server opens the conflict
   window, and offline the version is queued. Read-only copies of older versions and documents

@@ -1,6 +1,6 @@
 """``adsk.fusion`` subset: design, component, construction planes, sketches,
 extrude / shell / fillet, user parameters and the plastic features and
-rules (docs/FUSION_SCRIPTS.md). Each supported call appends R-CAD commands
+rules (docs/SCRIPTING.md). Each supported call appends R-CAD commands
 through the recorder; anything else raises NotSupported."""
 
 import math
@@ -341,7 +341,7 @@ class BRepEdges(Base):
 
     def _single(self, *_):
         raise NotSupported(
-            "single B-rep edges are not addressable in R-CAD's Fusion API subset; "
+            "single B-rep edges are not addressable in R-CAD's scripting API subset; "
             "pass the face itself (all of its edges) to the fillet"
         )
 
@@ -1330,7 +1330,7 @@ class BossFeatureSideInput(Base):
                 )
         elif name in self._UNMAPPED:
             raise NotSupported(
-                "adsk.fusion.BossFeatureSideInput.%s is not in R-CAD's Fusion API subset "
+                "adsk.fusion.BossFeatureSideInput.%s is not in R-CAD's scripting API subset "
                 "(drafted alignment steps, counterbores/countersinks on side 1 and rib cut "
                 "profiles are not modelled)" % name
             )
@@ -1356,7 +1356,7 @@ class BossFeatureSideInput(Base):
     def _unmapped(name):
         def f(self, *args, **kwargs):
             raise NotSupported(
-                "adsk.fusion.BossFeatureSideInput.%s is not in R-CAD's Fusion API subset" % name
+                "adsk.fusion.BossFeatureSideInput.%s is not in R-CAD's scripting API subset" % name
             )
 
         return f
@@ -1407,7 +1407,7 @@ class BossFeatureInput(Base):
     def side2(self, value):
         if value is not None:
             raise NotSupported(
-                "adsk.fusion.BossFeatureInput.side2 is not in R-CAD's Fusion API subset "
+                "adsk.fusion.BossFeatureInput.side2 is not in R-CAD's scripting API subset "
                 "(the mating boss needs the mate face; use R-CAD's plastics boss 'mate' input)"
             )
 
@@ -1622,7 +1622,7 @@ class RibFeatureInput(Base):
     @isThicknessFromTop.setter
     def isThicknessFromTop(self, value):
         if value:
-            raise NotSupported("adsk.fusion.%s.isThicknessFromTop is not in R-CAD's Fusion API subset" % self._member())
+            raise NotSupported("adsk.fusion.%s.isThicknessFromTop is not in R-CAD's scripting API subset" % self._member())
 
     @property
     def isExtended(self):

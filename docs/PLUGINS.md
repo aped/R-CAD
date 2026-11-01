@@ -212,7 +212,7 @@ Answers are untrusted. They are parsed into typed values and checked before use,
 that is neither `ok` nor `error` fails the call.
 
 **Trust.** R-CAD contains a misbehaving plugin program but does not sandbox it. An installed
-plugin runs with your user's permissions, as Fusion add-ins do. Install plugins you trust.
+plugin runs with your user's permissions, as add-ins generally do. Install plugins you trust.
 Documents never contain plugin code.
 
 **Writing one in Python.** `examples/plugins/standoffs/rcad_plugin.py` is a one-file,
@@ -234,17 +234,17 @@ against closed-form volumes, a parameter edit, a plugin refusal, then save and r
    `crates/rcad-commands/tests/it/plastics/`). Unit-test the manifest (`Manifest::validate`) and
    the rule templates.
 
-## Relation to Fusion add-ins
+## Relation to the add-in scripting API
 
-| Fusion | R-CAD |
+| Add-in API | R-CAD |
 |---|---|
 | add-in folder with a `.manifest` | plugin directory with `plugin.json` (external) or a compiled-in crate |
 | command definition with dialog inputs | feature schema; the app's generic plugin dialog renders it |
 | custom feature (one timeline node, own parameters, built from native features) | `FeatureKind::Plugin`: one history item, parameters as slots, built from checked operations |
 | model parameters created by plastic rules | user parameters from `data_effects` |
 
-Fusion scripts written in Python against a documented subset of the add-in API (sketches,
+Scripts written in Python against a documented subset of the add-in API (sketches,
 extrudes, shell, fillets, user parameters, and the plastics API objects Boss, Rib, Web and plastic
-rules) run with `rcad-cli fusion-script SCRIPT.py`. That compatibility layer
-(`compat/fusion/adsk`, docs/FUSION_SCRIPTS.md) records the script's calls as R-CAD commands. API
-members outside the subset fail by name; it does not run C++ add-ins or Fusion's UI events.
+rules) run with `rcad-cli script SCRIPT.py`. That compatibility layer
+(`compat/scripting/adsk`, docs/SCRIPTING.md) records the script's calls as R-CAD commands. API
+members outside the subset fail by name; it does not run C++ add-ins or the reference application's UI events.

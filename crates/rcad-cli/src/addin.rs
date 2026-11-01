@@ -1,27 +1,27 @@
-//! `rcad-cli fusion-addin ADDIN_DIR [--list] [--command ID] [--input ID=VALUE ...]
-//! [--base SCRIPT.py] [--out DOC.rcad.json] [--commands OUT.json]` (docs/FUSION_SCRIPTS.md,
+//! `rcad-cli addin ADDIN_DIR [--list] [--command ID] [--input ID=VALUE ...]
+//! [--base SCRIPT.py] [--out DOC.rcad.json] [--commands OUT.json]` (docs/SCRIPTING.md,
 //! "Add-ins").
 //!
-//! Runs an add-in folder written for a subset of the Fusion add-in API without a user
+//! Runs an add-in folder written for a subset of the add-in scripting API without a user
 //! interface: the manifest (`<Name>.manifest`, `type` `addin`) is checked here, then the
 //! bootstrap (`adsk._addin`) imports `<Name>.py`, calls its `run(context)` and plays the
 //! user's part for one command: `commandCreated`, the `--input` values (each firing
 //! `inputChanged`), `validateInputs`, a discarded `executePreview`, `execute`, `destroy`
 //! and the add-in's `stop(context)`. The recorded commands then run as for
-//! `fusion-script`. `--list` prints the registered commands and their inputs instead.
+//! `script`. `--list` prints the registered commands and their inputs instead.
 //!
 //! Exit status: 0 success; 1 the add-in failed (Python error, unsupported member, an input
 //! it cannot take, inputs its validateInputs handler rejected) or a step was refused; 2 the
 //! folder, manifest or Python file cannot be read, the manifest is not an add-in's, Python
 //! is missing, or an output cannot be written; 64 usage.
-use crate::fusion::{Bootstrap, execute};
 use crate::out::{esay, say};
+use crate::pyscript::{Bootstrap, execute};
 use serde_json::{Value, json};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-const USAGE: &str = "usage: rcad-cli fusion-addin ADDIN_DIR [--list] [--command ID] \
+const USAGE: &str = "usage: rcad-cli addin ADDIN_DIR [--list] [--command ID] \
                      [--input ID=VALUE ...] [--base SCRIPT.py] [--out DOC.rcad.json] \
                      [--commands OUT.json]";
 
@@ -140,7 +140,7 @@ fn load(dir: &Path) -> Result<Addin, String> {
         Some(t) if t.eq_ignore_ascii_case("addin") => {}
         Some(t) if t.eq_ignore_ascii_case("script") => {
             return Err(format!(
-                "{} describes a script, not an add-in; run its .py with rcad-cli fusion-script",
+                "{} describes a script, not an add-in; run its .py with rcad-cli script",
                 manifest_path.display()
             ));
         }
@@ -200,7 +200,7 @@ fn load(dir: &Path) -> Result<Addin, String> {
     })
 }
 
-/// `fusion-addin` with its arguments (after the word `fusion-addin`).
+/// `addin` with its arguments (after the word `addin`).
 pub fn run(args: &[String]) -> ExitCode {
     let Some(a) = parse(args) else {
         return usage();
@@ -211,7 +211,7 @@ pub fn run(args: &[String]) -> ExitCode {
     let addin = match load(dir) {
         Ok(x) => x,
         Err(e) => {
-            esay!("fusion-addin: {e}");
+            esay!("addin: {e}");
             return ExitCode::from(2);
         }
     };
@@ -240,7 +240,7 @@ pub fn run(args: &[String]) -> ExitCode {
         return ExitCode::from(2);
     }
     let recorded = match boot.run(
-        "fusion-addin",
+        "addin",
         &[OsStr::new("--addin"), request_path.as_os_str()],
         &addin.script,
     ) {
@@ -273,14 +273,14 @@ pub fn run(args: &[String]) -> ExitCode {
     }
     if let Some(info) = &recorded.addin {
         esay!(
-            "fusion-addin: ran command {} (preview: {})",
+            "addin: ran command {} (preview: {})",
             info["command"],
             info["preview"].as_str().unwrap_or("none")
         );
     }
     crate::load_plugins();
     execute(
-        "fusion-addin",
+        "addin",
         recorded.steps,
         a.out.as_deref(),
         a.commands.as_deref(),

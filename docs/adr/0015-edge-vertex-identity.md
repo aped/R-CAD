@@ -8,7 +8,7 @@ ADR 0003 made face references semantic: `FaceRef { feature, role }` names a face
 that generates it and the role the face plays (extrusion caps, the side of sketch line `e`, an
 imported face, a pattern occurrence's face, a chamfer face). The frame comes from the feature
 definition; the B-rep only validates it; an ambiguous or missing match is a `BrokenReference`,
-never a guess. That rule has held up, but the vocabulary is too small for Fusion-style modelling:
+never a guess. That rule has held up, but the vocabulary is too small for parametric mechanical modelling:
 
 * Edges and vertices have no identity at all. `Fillet { a, b }` and `Chamfer { a, b }` name an
   edge as the intersection of two planar faces, which works for one straight edge of a prism and
@@ -88,7 +88,7 @@ the generating sketch entity where one exists, else by fingerprint.
 * Picking runs on a bounding-volume hierarchy over triangles, edge segments and vertices, in
   `rcad-viewport`, with a pixel tolerance (screen-space distance for edges and vertices) that is
   independent of the model tolerances in `rcad-kernel` (`docs/TOLERANCES.md`). Priority on a
-  tie: vertex, then edge, then face, as in Fusion.
+  tie: vertex, then edge, then face.
 * Budget: a pick over a million triangles in under 2 ms on the reference desktop (release
   build), so hover highlighting stays interactive.
 
