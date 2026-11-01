@@ -565,31 +565,20 @@ impl Drop for ChildGuard {
 }
 
 /// Send SIGKILL to process group `pgid` (the program was started as its
-/// leader). Best effort: the standard library has no `killpg`, so this runs
-/// `kill(1)`; the program itself is also killed directly. While processes of
-/// the group remain, the kernel keeps the group id from being reused.
+/// leader). Best effort; the program itself is also killed directly. While
+/// processes of the group remain, the kernel keeps the group id from being
+/// reused.
 #[cfg(unix)]
 fn kill_group(pgid: u32) {
-    let Ok(pgid) = i32::try_from(pgid) else {
+    use rustix::process::{Pid, Signal, kill_process_group};
+    let Some(pid) = i32::try_from(pgid)
+        .ok()
+        .filter(|p| *p > 1)
+        .and_then(Pid::from_raw)
+    else {
         return;
     };
-    if pgid <= 1 {
-        return;
-    }
-    let target = format!("-{pgid}");
-    for kill in ["/bin/kill", "/usr/bin/kill"] {
-        if Path::new(kill).is_file() {
-            let r = Command::new(kill)
-                .args(["-KILL", "--", &target])
-                .stdin(Stdio::null())
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status();
-            if r.is_ok() {
-                return;
-            }
-        }
-    }
+    let _ = kill_process_group(pid, Signal::KILL);
 }
 
 #[cfg(not(unix))]

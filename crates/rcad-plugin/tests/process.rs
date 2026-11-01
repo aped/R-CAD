@@ -534,9 +534,10 @@ fn an_endless_answer_is_cut_off_and_the_program_killed() {
         "echo $$ > pid\ncat >/dev/null\nwhile :; do echo '{\"ok\": [1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9]}'; done\n",
         Some(60),
     );
-    // A faster flood than the shell loop when `yes` exists.
-    let yes = std::process::Command::new("yes")
-        .arg("--version")
+    // A faster flood than the shell loop when `yes` exists. Probed with
+    // `command -v`: BSD `yes --version` prints "--version" forever.
+    let yes = std::process::Command::new("sh")
+        .args(["-c", "command -v yes"])
         .stdout(std::process::Stdio::null())
         .status()
         .is_ok_and(|s| s.success());

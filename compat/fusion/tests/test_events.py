@@ -414,12 +414,18 @@ class Driver(unittest.TestCase):
         pts = r["steps"][1]["command"]["sketch"]["points"]
         self.assertEqual(max(p["x"] for p in pts), 20.0)
         self.assertEqual(r["addin"]["command"], "Cmd")
-        self.assertEqual(r["addin"]["preview"], "discarded")
+        # Without fork (Windows) previews are skipped (docs/FUSION_SCRIPTS.md).
+        self.assertEqual(r["addin"]["preview"], "discarded" if hasattr(os, "fork") else "skipped")
         self.assertEqual(r["addin"]["inputs"][0]["expression"], "2 cm")
 
     def test_a_valid_preview_result_is_kept(self):
         r = self.run_addin(preview_extra="args.isValidResult = True")
         self.assertNotIn("error", r, r)
+        if not hasattr(os, "fork"):
+            # Previews are skipped without fork: execute builds the model.
+            self.assertEqual(r["addin"]["preview"], "skipped")
+            self.assertIn("execute", module().LOG)
+            return
         self.assertEqual(module().LOG, ["preview", "destroy 1", "stop"])
         self.assertEqual(r["steps"][2]["command"]["distance"], 50.0)
         self.assertEqual(r["addin"]["preview"], "kept")

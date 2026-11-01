@@ -45,6 +45,7 @@ notice and links when running from an AppImage.
 | truck-topology | 0.6.0 | Apache-2.0 | same | rcad-kernel |
 | serde | 1.0.229 | MIT OR Apache-2.0 | crates.io | all |
 | thiserror | 2.0.21 | MIT OR Apache-2.0 | crates.io | all |
+| rustix | 1.1.5 (`std`, `process`) | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | crates.io | rcad-plugin on Unix: killing a plugin program's process group without an external `kill` |
 | rfd | 0.17.2 (features `xdg-portal`, `wayland`; no GTK) | MIT | https://github.com/PolyMeilex/rfd | rcad (Browse… file dialogs; on Linux through the XDG desktop portal over D-Bus, pure Rust) |
 | pollster | 0.4.0 (transitive) | Apache-2.0 OR MIT | crates.io (via rfd) | rcad |
 | rustc-hash | 2.1.3 | Apache-2.0 OR MIT | https://github.com/rust-lang/rustc-hash (already in the tree via truck-shapeops) | rcad-kernel (Fx hashing of the tessellation's vertex-weld and edge maps) |
